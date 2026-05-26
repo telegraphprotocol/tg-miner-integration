@@ -37,6 +37,7 @@ const CARDS = [
 
 export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const handlers: Record<string, () => void> = {
     create: onCreate,
@@ -54,15 +55,40 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
           <span className="lv2-logo-text">TELEGRAPH</span>
           <span className="lv2-logo-badge">MINER REGISTRY</span>
         </div>
-        <div className="lv2-nav-links">
-          <a href="https://telegraphprotocol.com/" target="_blank" rel="noopener noreferrer" className="lv2-nav-link">
+
+        <button
+          type="button"
+          className={`lv2-nav-toggle ${menuOpen ? 'lv2-nav-toggle-open' : ''}`}
+          aria-label="Toggle menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(v => !v)}
+        >
+          <span className="lv2-nav-toggle-bar" />
+          <span className="lv2-nav-toggle-bar" />
+          <span className="lv2-nav-toggle-bar" />
+        </button>
+
+        <div className={`lv2-nav-links ${menuOpen ? 'lv2-nav-links-open' : ''}`}>
+          <a
+            href="https://telegraphprotocol.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lv2-nav-link"
+            onClick={() => setMenuOpen(false)}
+          >
             Telegraph Protocol
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
               <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
             </svg>
           </a>
-          <a href="https://telegraph-2.gitbook.io/telegraph" target="_blank" rel="noopener noreferrer" className="lv2-nav-link">
+          <a
+            href="https://telegraph-2.gitbook.io/telegraph"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="lv2-nav-link"
+            onClick={() => setMenuOpen(false)}
+          >
             Docs
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>

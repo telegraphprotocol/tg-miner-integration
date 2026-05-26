@@ -7,18 +7,6 @@ interface Props {
   set: (key: keyof FormState, value: unknown) => void;
 }
 
-function Chips({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="chips">
-      {options.map(o => (
-        <button key={o} type="button" className={`chip ${value === o ? 'chip-on' : ''}`} onClick={() => onChange(o)}>
-          {o}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function Tooltip({ lines }: { lines: string[] }) {
   return (
     <span className="field-tooltip-wrap">
@@ -61,13 +49,12 @@ export default function BasicsSection({ state, set }: Props) {
 
       <div className="field-group">
         <label className="field-label">
-          Kind <span className="field-required">*</span>
+          Kind
           <Tooltip lines={[
-            '<strong>subnet</strong> — on-demand AI inference API called per request.',
-            '<strong>validator</strong> — scheduled data feed polled by the autonomous engine.',
+            'All integrations are <strong>miner</strong> — on-demand AI inference APIs called per request.',
           ]} />
         </label>
-        <Chips options={['subnet', 'validator']} value={state.kind} onChange={v => set('kind', v)} />
+        <input className="field-input field-locked" value="miner" readOnly />
       </div>
 
       <div className="field-group">

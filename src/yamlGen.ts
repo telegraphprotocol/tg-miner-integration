@@ -128,14 +128,6 @@ export function generateYaml(s: FormState): string {
     lines.push('');
   }
 
-  // Polling (validator only)
-  if (s.kind === 'validator' && s.polling_interval_seconds) {
-    lines.push(`polling:`);
-    lines.push(`  interval_seconds: ${s.polling_interval_seconds}`);
-    if (s.polling_cache_ttl_seconds) lines.push(`  cache_ttl_seconds: ${s.polling_cache_ttl_seconds}`);
-    lines.push('');
-  }
-
   // Input schema
   const inputSchemaObj = s.input_schema_fields.length
     ? schemaFieldsToJson(s.input_schema_fields)

@@ -41,9 +41,10 @@ export default function Header({ step, onGoHome }: Props) {
 
       <div className="app-header-right">
         <ConnectButton
-          chainStatus="icon"
+          chainStatus={{ smallScreen: 'none', largeScreen: 'icon' }}
           showBalance={false}
-          accountStatus="avatar"
+          accountStatus={{ smallScreen: 'avatar', largeScreen: 'avatar' }}
+          label="Connect"
         />
       </div>
     </header>

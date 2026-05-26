@@ -131,7 +131,7 @@ export default function ImportModal({ onImport, onClose }: Props) {
           <textarea
             className="field-input field-textarea field-mono import-textarea"
             rows={12}
-            placeholder={`version: "1"\nkind: subnet\nid: 34\nslug: bittensor-sn34-bitmind\nname: BitMind Deepfake Detector\nbase_url: https://api.bitmind.ai\n...`}
+            placeholder={`version: "1"\nkind: miner\nid: 34\nslug: bittensor-sn34-bitmind\nname: BitMind Deepfake Detector\nbase_url: https://api.bitmind.ai\n...`}
             value={yamlText}
             onChange={e => { setYamlText(e.target.value); setError(''); }}
             spellCheck={false}

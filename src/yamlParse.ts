@@ -99,7 +99,7 @@ export function parseYamlToForm(yamlStr: string): FormState {
 
   return {
     ...DEFAULT_FORM,
-    kind: str(doc.kind) || 'subnet',
+    kind: 'miner',
     id: doc.id != null ? str(doc.id) : '',
     slug: str(doc.slug),
     protocol: str(doc.protocol) || 'bittensor',

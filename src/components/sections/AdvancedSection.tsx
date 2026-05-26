@@ -12,16 +12,6 @@ interface Props {
 
 type SchemaMode = 'visual' | 'raw';
 
-function InfoIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="12" cy="12" r="10"/>
-      <line x1="12" y1="8" x2="12" y2="12"/>
-      <line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-  );
-}
-
 function ModeToggle({ mode, onSwitch }: { mode: SchemaMode; onSwitch: (m: SchemaMode) => void }) {
   return (
     <div className="schema-mode-toggle">
@@ -120,7 +110,6 @@ function SchemaSection({
 }
 
 export default function AdvancedSection({ state, set }: Props) {
-  const isValidator = state.kind === 'validator';
   const [inputMode, setInputMode] = useState<SchemaMode>(
     state.input_schema_fields.length > 0 ? 'visual' : 'raw'
   );
@@ -130,49 +119,6 @@ export default function AdvancedSection({ state, set }: Props) {
 
   return (
     <div className="section-fields">
-      {/* Polling — only relevant for validator */}
-      {isValidator ? (
-        <>
-          <div className="section-divider"><span>Polling Configuration</span></div>
-          <p className="section-desc-sm">
-            Required for <code className="inline-code">kind: validator</code>. Defines how frequently the node polls this integration for fresh data.
-          </p>
-          <div className="field-row-2">
-            <div className="field-group">
-              <label className="field-label">Poll Interval (sec) <span className="field-required">*</span></label>
-              <input
-                className="field-input"
-                type="number"
-                min="1"
-                placeholder="60"
-                value={state.polling_interval_seconds}
-                onChange={e => set('polling_interval_seconds', e.target.value)}
-              />
-            </div>
-            <div className="field-group">
-              <label className="field-label">Cache TTL (sec)</label>
-              <input
-                className="field-input"
-                type="number"
-                min="0"
-                placeholder="300"
-                value={state.polling_cache_ttl_seconds}
-                onChange={e => set('polling_cache_ttl_seconds', e.target.value)}
-              />
-              <p className="field-hint">How long to serve cached data after a successful poll.</p>
-            </div>
-          </div>
-        </>
-      ) : (
-        <div className="notice-card">
-          <InfoIcon />
-          <span>
-            Polling config applies to <code className="inline-code">kind: validator</code> only.
-            Change the kind in the Basics section if needed.
-          </span>
-        </div>
-      )}
-
       <div className="section-divider"><span>Input Schema</span></div>
       <SchemaSection
         title="Input Schema"
