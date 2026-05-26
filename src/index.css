@@ -2167,12 +2167,13 @@ body::before {
 
 /* ── Logo ── */
 /* ── Navbar ── */
-.lv2-nav {
+.lv2-nav,
+.lv2 > .lv2-nav {
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  z-index: 10;
+  z-index: 60;
   position: relative;
 }
 
@@ -2263,16 +2264,15 @@ body::before {
     gap: 4px;
     min-width: 220px;
     padding: 10px;
-    background: rgba(8,8,12,0.95);
-    border: 1px solid rgba(255,255,255,0.1);
+    background: #0a0a0e;
+    border: 1px solid rgba(255,255,255,0.14);
     border-radius: 8px;
-    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
-    backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.6);
     opacity: 0;
     transform: translateY(-6px);
     pointer-events: none;
     transition: opacity 0.2s ease, transform 0.2s ease;
-    z-index: 50;
+    z-index: 100;
   }
 
   .lv2-nav-links-open {
