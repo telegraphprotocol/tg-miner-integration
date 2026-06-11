@@ -123,4 +123,4 @@ Applies to all three paths once you reach the Register On-Chain screen.
 ## Links
 
 - [Telegraph Protocol](https://telegraphprotocol.com/)
-- [Documentation](https://telegraph-2.gitbook.io/telegraph)
+- [Documentation](https://docs.telegraphprotocol.com)

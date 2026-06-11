@@ -1,7 +1,7 @@
 import type { FormState } from './types';
 
 export const DEFAULT_FORM: FormState = {
-  kind: 'miner',
+  kind: 'subnet',
   id: '',
   slug: '',
   protocol: '',

@@ -83,7 +83,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
             </svg>
           </a>
           <a
-            href="https://telegraph-2.gitbook.io/telegraph"
+            href="https://docs.telegraphprotocol.com"
             target="_blank"
             rel="noopener noreferrer"
             className="lv2-nav-link"

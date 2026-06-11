@@ -78,13 +78,14 @@ function FieldItemRow({ item, idx, onChange, onRemove, showMultiplier, showTrans
           </div>
         </div>
         <div className="field-group">
-          <label className="field-label">Description</label>
+          <label className="field-label">Description <span className="field-required">*</span></label>
           <input
-            className="field-input"
+            className={`field-input${!item.description ? ' field-input-warn' : ''}`}
             placeholder="What this field represents and any conversion notes."
             value={item.description}
             onChange={e => f('description', e.target.value)}
           />
+          {!item.description && <p className="field-error" style={{ marginTop: 4 }}>Required by the schema.</p>}
         </div>
         {(showMultiplier || showTransformRule) && (
           <div className="field-row-2">

@@ -13,21 +13,58 @@ interface Props {
   onNext: () => void;
 }
 
-type UploadState = 'idle' | 'uploading' | 'done' | 'error';
+const VALIDATOR_BASE_URL = process.env.NEXT_PUBLIC_VALIDATOR_BASE_URL ?? '';
+
+// TEMPORARY: backend validator currently only accepts kind ∈ {"subnet","validator"}.
+// Map legacy `kind: miner` → `kind: subnet` at the wire boundary so existing
+// configs validate and pin correctly. Remove once the validator API is updated.
+function mapKindMinerToSubnet(yamlStr: string): string {
+  return yamlStr.replace(
+    /^(\s*kind\s*:\s*)(['"]?)miner\2(\s*(?:#.*)?)$/m,
+    '$1$2subnet$2$3',
+  );
+}
+
+type UploadState = 'idle' | 'validating' | 'uploading' | 'done' | 'error';
 
 export default function PinataUpload({ yaml, name, result, onResult, onBack, onNext }: Props) {
   const [state, setState] = useState<UploadState>(result ? 'done' : 'idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const handleUpload = async () => {
-    setState('uploading');
+    setState('validating');
     setErrorMsg('');
+    setValidationErrors([]);
+
+    const yamlForServer = mapKindMinerToSubnet(yaml);
+
+    try {
+      const vRes = await fetch(`${VALIDATOR_BASE_URL}/api/miner/validate-yaml`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yaml: yamlForServer }),
+      });
+      if (!vRes.ok) throw new Error(`Validation request failed (${vRes.status})`);
+      const vData = await vRes.json();
+      if (!vData.valid) {
+        setValidationErrors(vData.errors ?? ['Unknown validation error']);
+        setState('error');
+        return;
+      }
+    } catch (err) {
+      setErrorMsg((err as Error).message ?? 'YAML validation request failed.');
+      setState('error');
+      return;
+    }
+
+    setState('uploading');
 
     try {
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml, name: name || 'miner-config' }),
+        body: JSON.stringify({ yaml: yamlForServer, name: name || 'miner-config' }),
       });
 
       const data = await res.json();
@@ -85,13 +122,27 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
 
           {errorMsg && <p className="field-error" style={{ marginBottom: '16px' }}>{errorMsg}</p>}
 
+          {validationErrors.length > 0 && (
+            <div className="field-error" style={{ marginBottom: '16px' }}>
+              <strong>YAML validation failed:</strong>
+              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
+              </ul>
+            </div>
+          )}
+
           {state !== 'done' && (
             <button
-              className={`btn-fill btn-full ${state === 'uploading' ? 'btn-loading' : ''}`}
+              className={`btn-fill btn-full ${(state === 'validating' || state === 'uploading') ? 'btn-loading' : ''}`}
               onClick={handleUpload}
-              disabled={state === 'uploading'}
+              disabled={state === 'validating' || state === 'uploading'}
             >
-              {state === 'uploading' ? (
+              {state === 'validating' ? (
+                <>
+                  <span className="spinner" />
+                  Validating YAML…
+                </>
+              ) : state === 'uploading' ? (
                 <>
                   <span className="spinner" />
                   Uploading to IPFS…

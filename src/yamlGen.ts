@@ -18,7 +18,7 @@ function renderOnChainFields(items: OnChainFieldItem[], type: string): string {
     const idx = f.index !== '' ? f.index : String(i);
     let block = `      - index: ${idx}\n`;
     if (f.name) block += `        name: ${f.name}\n`;
-    if (f.description) block += `        description: ${blockOrInline(f.description, '        ')}\n`;
+    block += `        description: ${blockOrInline(f.description || '', '        ')}\n`;
     if (f.source_path) block += `        source_path: ${f.source_path}\n`;
     if (f.multiplier) block += `        multiplier: ${f.multiplier}\n`;
     if (f.transform_rule) block += `        transform_rule: ${f.transform_rule}\n`;
