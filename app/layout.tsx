@@ -5,12 +5,12 @@ import Providers from '../src/providers';
 export const metadata: Metadata = {
   title: 'Telegraph — Miner Registry',
   description: 'Register and manage your Telegraph Protocol miner node.',
-  metadataBase: new URL('https://miners.telegraphprotocol.com'),
+  metadataBase: new URL('https://integrate.telegraphprotocol.com'),
   icons: { icon: '/logo.png' },
   openGraph: {
     title: 'Telegraph — Miner Registry',
     description: 'Register and manage your Telegraph Protocol miner node.',
-    url: 'https://miners.telegraphprotocol.com',
+    url: 'https://integrate.telegraphprotocol.com',
     siteName: 'Telegraph Miner Registry',
     images: [
       {
