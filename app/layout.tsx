@@ -4,7 +4,30 @@ import Providers from '../src/providers';
 
 export const metadata: Metadata = {
   title: 'Telegraph — Miner Registry',
+  description: 'Register and manage your Telegraph Protocol miner node.',
+  metadataBase: new URL('https://miners.telegraphprotocol.com'),
   icons: { icon: '/logo.png' },
+  openGraph: {
+    title: 'Telegraph — Miner Registry',
+    description: 'Register and manage your Telegraph Protocol miner node.',
+    url: 'https://miners.telegraphprotocol.com',
+    siteName: 'Telegraph Miner Registry',
+    images: [
+      {
+        url: '/telegraph-social-card.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Telegraph Protocol',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Telegraph — Miner Registry',
+    description: 'Register and manage your Telegraph Protocol miner node.',
+    images: ['/telegraph-social-card.jpg'],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
