@@ -93,7 +93,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
   const validationErrors = [priceError, intentError, urlError, hashError, feeError].filter(Boolean);
 
-  const { writeContract, data: txHash, isTxInFlight: isWritePending, error: writeError, reset } = useWriteContract();
+  const { writeContract, data: txHash, isPending: isWritePending, error: writeError, reset } = useWriteContract();
   const {
     isLoading: isConfirming,
     isSuccess: isConfirmed,
