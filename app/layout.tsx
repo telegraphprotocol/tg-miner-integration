@@ -4,12 +4,12 @@ import Providers from '../src/providers';
 
 export const metadata: Metadata = {
   title: 'Telegraph — Miner Registry',
-  description: 'Register and manage your Telegraph Protocol miner node.',
+  description: 'Register your Telegraph Protocol miner node.',
   metadataBase: new URL('https://integrate.telegraphprotocol.com'),
   icons: { icon: '/logo.png' },
   openGraph: {
     title: 'Telegraph — Miner Registry',
-    description: 'Register and manage your Telegraph Protocol miner node.',
+    description: 'Register your Telegraph Protocol miner node.',
     url: 'https://integrate.telegraphprotocol.com',
     siteName: 'Telegraph Miner Registry',
     images: [
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Telegraph — Miner Registry',
-    description: 'Register and manage your Telegraph Protocol miner node.',
+    description: 'Register your Telegraph Protocol miner node.',
     images: ['/telegraph-social-card.jpg'],
   },
 };
