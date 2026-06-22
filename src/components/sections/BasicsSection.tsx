@@ -51,11 +51,11 @@ export default function BasicsSection({ state, set }: Props) {
         <label className="field-label">
           Kind
           <Tooltip lines={[
-            '<strong>subnet</strong> — on-demand AI inference API (miner). <strong>validator</strong> — validation/scoring service.',
+            '<strong>miner</strong> — on-demand AI inference API. <strong>validator</strong> — validation/scoring service.',
           ]} />
         </label>
         <div className="chips">
-          {['subnet', 'validator'].map(o => (
+          {['miner', 'validator'].map(o => (
             <button key={o} type="button" className={`chip ${state.kind === o ? 'chip-on' : ''}`} onClick={() => set('kind', o)}>
               {o}
             </button>

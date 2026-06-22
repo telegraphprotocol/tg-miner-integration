@@ -3,8 +3,7 @@ import { baseSepolia } from 'wagmi/chains';
 import { http } from 'wagmi';
 
 const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ||
-  'https://base-sepolia.g.alchemy.com/v2/aKrIQPvnY5pM8AkdVNDM7';
+  process.env.NEXT_PUBLIC_RPC_URL || 'https://sepolia.base.org';
 
 export const wagmiConfig = getDefaultConfig({
   appName: 'Telegraph Miner Registry',

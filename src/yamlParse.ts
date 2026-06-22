@@ -97,10 +97,8 @@ export function parseYamlToForm(yamlStr: string): FormState {
     ? (schemaJsonToFields(doc.output_schema) ?? [])
     : [];
 
-  // Read kind from the doc, but normalize the legacy `miner` value to `subnet`
-  // so it round-trips through the form (chips only allow subnet/validator).
   const rawKind = str(doc.kind);
-  const normalizedKind = rawKind === 'miner' ? 'subnet' : (rawKind || 'subnet');
+  const normalizedKind = rawKind === 'subnet' ? 'miner' : (rawKind || 'miner');
 
   return {
     ...DEFAULT_FORM,

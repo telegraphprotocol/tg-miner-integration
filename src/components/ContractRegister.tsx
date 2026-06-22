@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAccount, useWriteContract } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
 import type { PinataResult } from '../types';
@@ -93,10 +93,18 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
   const validationErrors = [priceError, intentError, urlError, hashError, feeError].filter(Boolean);
 
-  const { writeContract, data: txHash, isPending, error: writeError, reset } = useWriteContract();
+  const { writeContract, data: txHash, isTxInFlight: isWritePending, error: writeError, reset } = useWriteContract();
+  const {
+    isLoading: isConfirming,
+    isSuccess: isConfirmed,
+    isError: isReceiptError,
+    error: receiptError,
+  } = useWaitForTransactionReceipt({ hash: txHash });
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
-  const isSuccess    = !!txHash;
+  const isSuccess    = isConfirmed;
+  const txError      = writeError ?? receiptError;
+  const isTxInFlight = isWritePending || isConfirming;
   const canSubmit    = isConnected && !wrongNetwork && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const handleRegister = () => {
@@ -264,7 +272,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   placeholder="https://gateway.pinata.cloud/ipfs/Qm…"
                   value={manualUrl}
                   onChange={e => setManualUrl(e.target.value)}
-                  disabled={isPending || isSuccess}
+                  disabled={isTxInFlight || isSuccess}
                 />
               </div>
               <div className="field-group">
@@ -274,7 +282,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                     type="button"
                     className="btn-hash-gen"
                     onClick={() => setShowHashModal(true)}
-                    disabled={isPending || isSuccess}
+                    disabled={isTxInFlight || isSuccess}
                   >
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -289,7 +297,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   placeholder="0xabc123… (64 hex chars)"
                   value={manualHash}
                   onChange={e => setManualHash(e.target.value)}
-                  disabled={isPending || isSuccess}
+                  disabled={isTxInFlight || isSuccess}
                 />
               </div>
               <div className="field-group">
@@ -300,7 +308,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   placeholder="chat_completion, web_search"
                   value={manualIntents}
                   onChange={e => setManualIntents(e.target.value)}
-                  disabled={isPending || isSuccess}
+                  disabled={isTxInFlight || isSuccess}
                 />
                 {intentError && manualIntents !== '' && <p className="field-error">{intentError}</p>}
               </div>
@@ -327,7 +335,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 placeholder="0x… EVM address for payouts"
                 value={feeAddress}
                 onChange={e => setFeeAddress(e.target.value)}
-                disabled={isPending || isSuccess}
+                disabled={isTxInFlight || isSuccess}
               />
               {feeError && feeAddress !== '' && <p className="field-error">{feeError}</p>}
             </div>
@@ -341,7 +349,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 placeholder="0.01"
                 value={minPrice}
                 onChange={e => setMinPrice(e.target.value)}
-                disabled={isPending || isSuccess}
+                disabled={isTxInFlight || isSuccess}
               />
               {priceError && minPrice !== '' && <p className="field-error">{priceError}</p>}
             </div>
@@ -365,7 +373,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
             )}
           </div>
 
-          {!isSuccess && !isPending && (
+          {!isSuccess && !isTxInFlight && (
             <>
               {/* pre-flight checklist */}
               {isConnected && !wrongNetwork && (
@@ -388,9 +396,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 </div>
               )}
 
-              {writeError && (
+              {txError && (
                 <p className="field-error" style={{ marginBottom: '16px' }}>
-                  {writeError.message?.split('\n')[0] ?? 'Transaction failed.'}
+                  {txError.message?.split('\n')[0] ?? 'Transaction failed.'}
                 </p>
               )}
 
@@ -407,19 +415,36 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   : wrongNetwork    ? 'Switch to Base Sepolia'
                   : !CONTRACT_ADDRESS ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
-                  : writeError      ? 'Retry Registration'
+                  : txError         ? 'Retry Registration'
                   : 'Register Miner'}
               </button>
             </>
           )}
 
-          {isPending && (
+          {isTxInFlight && (
             <div className="tx-pending">
               <div className="tx-pending-inner">
                 <span className="spinner spinner-lg" />
                 <div className="tx-pending-text">
-                  <span className="tx-pending-title">Awaiting signature…</span>
-                  <span className="tx-pending-sub">Approve the transaction in your wallet.</span>
+                  <span className="tx-pending-title">
+                    {isWritePending ? 'Awaiting signature…' : 'Confirming on-chain…'}
+                  </span>
+                  <span className="tx-pending-sub">
+                    {isWritePending
+                      ? 'Approve the transaction in your wallet.'
+                      : 'Waiting for Base Sepolia confirmation. This usually takes a few seconds.'}
+                  </span>
+                  {txHash && !isWritePending && (
+                    <a
+                      className="result-row-link result-mono"
+                      href={`${BASE_SEPOLIA_EXPLORER}/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ marginTop: 8, display: 'inline-flex' }}
+                    >
+                      View pending tx on BaseScan
+                    </a>
+                  )}
                 </div>
               </div>
             </div>

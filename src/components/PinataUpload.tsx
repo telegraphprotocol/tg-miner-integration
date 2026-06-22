@@ -4,6 +4,24 @@ import { useState } from 'react';
 import type { PinataResult } from '../types';
 import YamlPreview from './YamlPreview';
 
+interface ValidationResult {
+  path: string;
+  method: string;
+  status: number;
+  success: boolean;
+  error?: string;
+  latency_ms: number;
+}
+
+interface ValidationResponse {
+  valid: boolean;
+  slug?: string;
+  name?: string;
+  errors: string[];
+  results: ValidationResult[] | null;
+  api_key_stored: boolean;
+}
+
 interface Props {
   yaml: string;
   name?: string;
@@ -13,40 +31,42 @@ interface Props {
   onNext: () => void;
 }
 
-const VALIDATOR_BASE_URL = process.env.NEXT_PUBLIC_VALIDATOR_BASE_URL ?? '';
-
-// TEMPORARY: backend validator currently only accepts kind ∈ {"subnet","validator"}.
-// Map legacy `kind: miner` → `kind: subnet` at the wire boundary so existing
-// configs validate and pin correctly. Remove once the validator API is updated.
-function mapKindMinerToSubnet(yamlStr: string): string {
-  return yamlStr.replace(
-    /^(\s*kind\s*:\s*)(['"]?)miner\2(\s*(?:#.*)?)$/m,
-    '$1$2subnet$2$3',
-  );
-}
-
 type UploadState = 'idle' | 'validating' | 'uploading' | 'done' | 'error';
 
 export default function PinataUpload({ yaml, name, result, onResult, onBack, onNext }: Props) {
   const [state, setState] = useState<UploadState>(result ? 'done' : 'idle');
+  const [apiKey, setApiKey] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationResults, setValidationResults] = useState<ValidationResult[] | null>(null);
+  const [apiKeyStored, setApiKeyStored] = useState(false);
 
   const handleUpload = async () => {
+    if (!apiKey.trim()) {
+      setErrorMsg('API key is required.');
+      setState('error');
+      return;
+    }
+
     setState('validating');
     setErrorMsg('');
     setValidationErrors([]);
-
-    const yamlForServer = mapKindMinerToSubnet(yaml);
+    setValidationResults(null);
+    setApiKeyStored(false);
 
     try {
-      const vRes = await fetch(`${VALIDATOR_BASE_URL}/api/miner/validate-yaml`, {
+      const vRes = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml: yamlForServer }),
+        body: JSON.stringify({ yaml, api_key: apiKey.trim() }),
       });
-      if (!vRes.ok) throw new Error(`Validation request failed (${vRes.status})`);
-      const vData = await vRes.json();
+      if (!vRes.ok && vRes.status !== 200) {
+        const vErr = await vRes.json().catch(() => ({}));
+        throw new Error(vErr.error ?? `Validation request failed (${vRes.status})`);
+      }
+      const vData = await vRes.json() as ValidationResponse;
+      setValidationResults(vData.results ?? null);
+      setApiKeyStored(vData.api_key_stored);
       if (!vData.valid) {
         setValidationErrors(vData.errors ?? ['Unknown validation error']);
         setState('error');
@@ -64,7 +84,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
       const res = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml: yamlForServer, name: name || 'miner-config' }),
+        body: JSON.stringify({ yaml, name: name || 'miner-config' }),
       });
 
       const data = await res.json();
@@ -83,20 +103,21 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
     }
   };
 
+  const busy = state === 'validating' || state === 'uploading';
+
   return (
     <div className="upload-layout">
       <div className="upload-main">
-        {/* Section heading */}
         <div className="step-section-heading">
           <div className="step-eyebrow">STEP 2 OF 3</div>
-          <h2 className="step-title">Upload to IPFS</h2>
+          <h2 className="step-title">Validate &amp; Upload to IPFS</h2>
           <p className="step-desc">
-            Pin your YAML configuration to IPFS. This creates a permanent,
-            content-addressed record of your miner configuration.
+            Your API key is sandbox-tested against every endpoint before pinning.
+            On success, it is stored in the node database so your miner goes live
+            automatically after on-chain registration.
           </p>
         </div>
 
-        {/* Upload card */}
         <div className="upload-card">
           <div className="upload-card-header">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -115,38 +136,82 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
             )}
           </div>
 
-          <p className="step-desc" style={{ marginBottom: '20px' }}>
-            Your YAML will be pinned to IPFS using the platform&apos;s Pinata integration.
-            No credentials required.
-          </p>
+          {state !== 'done' && (
+            <div className="field-group" style={{ marginBottom: '20px' }}>
+              <label className="field-label">
+                API Key <span className="field-required">*</span>
+              </label>
+              <input
+                className="field-input"
+                type="password"
+                placeholder="Paste your upstream API key"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                disabled={busy}
+                autoComplete="off"
+              />
+              <p className="field-hint" style={{ marginTop: '4px', fontSize: '11px', opacity: 0.55 }}>
+                Tested against your endpoints, then stored in the node DB. Never logged.
+              </p>
+            </div>
+          )}
 
           {errorMsg && <p className="field-error" style={{ marginBottom: '16px' }}>{errorMsg}</p>}
 
           {validationErrors.length > 0 && (
             <div className="field-error" style={{ marginBottom: '16px' }}>
-              <strong>YAML validation failed:</strong>
+              <strong>Validation failed:</strong>
               <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
                 {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
               </ul>
             </div>
           )}
 
+          {validationResults && validationResults.length > 0 && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', opacity: 0.55, marginBottom: '8px' }}>
+                ENDPOINT RESULTS
+                {apiKeyStored && (
+                  <span className="badge-success" style={{ marginLeft: '8px', fontSize: '10px' }}>
+                    <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                      <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    API KEY STORED
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {validationResults.map((r, i) => (
+                  <div key={i} style={{
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    fontSize: '12px', fontFamily: 'var(--font-mono, monospace)',
+                    padding: '6px 10px', borderRadius: '6px',
+                    background: r.success ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
+                    border: `1px solid ${r.success ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                  }}>
+                    <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
+                      {r.success ? '✓' : '✗'}
+                    </span>
+                    <span style={{ opacity: 0.6, minWidth: '36px' }}>{r.method}</span>
+                    <span style={{ flex: 1 }}>{r.path}</span>
+                    <span style={{ opacity: 0.5 }}>HTTP {r.status}</span>
+                    <span style={{ opacity: 0.4, minWidth: '52px', textAlign: 'right' }}>{r.latency_ms}ms</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {state !== 'done' && (
             <button
-              className={`btn-fill btn-full ${(state === 'validating' || state === 'uploading') ? 'btn-loading' : ''}`}
+              className={`btn-fill btn-full ${busy ? 'btn-loading' : ''}`}
               onClick={handleUpload}
-              disabled={state === 'validating' || state === 'uploading'}
+              disabled={busy || !apiKey.trim()}
             >
               {state === 'validating' ? (
-                <>
-                  <span className="spinner" />
-                  Validating YAML…
-                </>
+                <><span className="spinner" />Validating endpoints…</>
               ) : state === 'uploading' ? (
-                <>
-                  <span className="spinner" />
-                  Uploading to IPFS…
-                </>
+                <><span className="spinner" />Uploading to IPFS…</>
               ) : (
                 <>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -154,14 +219,13 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
                     <line x1="12" y1="12" x2="12" y2="21"/>
                     <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
                   </svg>
-                  {state === 'error' ? 'Retry Upload' : 'Upload to IPFS'}
+                  {state === 'error' ? 'Retry' : 'Validate & Upload to IPFS'}
                 </>
               )}
             </button>
           )}
         </div>
 
-        {/* Result card */}
         {result && (
           <div className="result-card">
             <div className="result-card-header">
@@ -203,7 +267,6 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
         </div>
       </div>
 
-      {/* Right: YAML preview (read-only) */}
       <div className="upload-preview-col">
         <YamlPreview yaml={yaml} />
       </div>
