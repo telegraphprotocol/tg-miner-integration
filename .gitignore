@@ -20,6 +20,10 @@ next-env.d.ts
 # Graphify
 graphify-out/
 
+# Local miner config drafts
+itsai-text-detector.yaml
+sapling-ai-detector.yaml
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
