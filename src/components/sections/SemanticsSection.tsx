@@ -19,7 +19,7 @@ function TrashIcon() {
 export default function SemanticsSection({ state, set }: Props) {
   const [newIntent, setNewIntent] = useState('');
 
-  const normalizeIntent = (v: string) => v.trim().toLowerCase().replace(/\s+/g, '_');
+  const normalizeIntent = (v: string) => v.trim().toUpperCase().replace(/\s+/g, '_');
 
   const addIntent = () => {
     const v = normalizeIntent(newIntent);
@@ -116,7 +116,7 @@ export default function SemanticsSection({ state, set }: Props) {
       <p className="section-desc-sm">
         Declare which tasks this integration can fulfill. The engine builds a{' '}
         <code className="inline-code">providersByIntent</code> routing map at startup.
-        Use lowercase snake_case. Click a canonical intent to add it, or type a custom one.
+        Use UPPER_SNAKE_CASE. Click a canonical intent to add it, or type a custom one.
       </p>
 
       {/* Added intents */}
@@ -161,14 +161,14 @@ export default function SemanticsSection({ state, set }: Props) {
           className="field-input field-mono"
           placeholder="custom_intent_name"
           value={newIntent}
-          onChange={e => setNewIntent(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
+          onChange={e => setNewIntent(e.target.value.toUpperCase().replace(/\s+/g, '_'))}
           onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addIntent())}
         />
         <button type="button" className="btn-add-sm btn-add-intent" onClick={addIntent}>
           <PlusIcon /> Add custom
         </button>
       </div>
-      <p className="field-hint">Lowercased and underscore-formatted automatically. Press Enter to add.</p>
+      <p className="field-hint">Uppercased and underscore-formatted automatically. Press Enter to add.</p>
     </div>
   );
 }
