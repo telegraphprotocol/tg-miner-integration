@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { FormState } from '../../types';
-import { SIGNAL_TYPES, CANONICAL_INTENTS } from '../../types';
+import { CANONICAL_INTENTS } from '../../types';
 
 interface Props {
   state: FormState;
@@ -45,28 +45,6 @@ export default function SemanticsSection({ state, set }: Props) {
       <p className="section-desc-sm">
         Tells the autonomous engine how to interpret this API's response. Works for any API type — classification, generation, embeddings, search, and more.
       </p>
-
-      {/* Signal type — fixed enum required by the node */}
-      <div className="field-group">
-        <label className="field-label">Signal Type <span className="field-required">*</span></label>
-        <div className="field-select-wrap">
-          <select
-            className="field-input field-select"
-            value={state.semantics_signal_type}
-            onChange={e => set('semantics_signal_type', e.target.value)}
-          >
-            <option value="">— Select canonical signal type —</option>
-            {SIGNAL_TYPES.map(t => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          <svg className="field-select-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-        </div>
-        <p className="field-hint">
-          Fixed enum — the node validates this against the canonical list.
-          Pick the type that best describes what your API produces.
-        </p>
-      </div>
 
       {/* Mapping fields — all optional */}
       <div className="field-row-3">

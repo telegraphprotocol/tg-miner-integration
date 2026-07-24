@@ -63,6 +63,18 @@ export interface OnChainRequestItem {
   query_fields: OnChainBodyField[];
 }
 
+export interface LimitationItem {
+  _id: string;
+  code: string;
+  message: string;
+  param: string;
+  property: string;
+  value_bytes: string;
+  value_num: string;
+  operator: string;
+  autoConfigured?: boolean;
+}
+
 export interface FormState {
   // Basics
   kind: string;
@@ -83,12 +95,22 @@ export interface FormState {
   auth_type: string;
   auth_env_var: string;
   auth_header_name: string;
+  auth_value_prefix: string;
+
+  // Docs
+  docs_website: string;
+  docs_documentation: string;
+  docs_repository: string;
+  docs_twitter: string;
+  docs_discord: string;
+
+  // Limitations
+  limitations: LimitationItem[];
 
   // Endpoints
   endpoints: EndpointItem[];
 
   // Semantics
-  semantics_signal_type: string;
   semantics_confidence_field: string;
   semantics_label_field: string;
   semantics_reason_field: string;
@@ -103,7 +125,6 @@ export interface FormState {
   onchain_strings: OnChainFieldItem[];
   onchain_integers: OnChainFieldItem[];
   onchain_bools: OnChainFieldItem[];
-  onchain_addresses: OnChainFieldItem[];
   onchain_request: OnChainRequestItem[];
 
   // Advanced
@@ -121,33 +142,35 @@ export interface PinataResult {
   gateway: string;
 }
 
-// Fixed enum — must match the node's canonical values exactly
-export const SIGNAL_TYPES = [
-  'media_authenticity',
-  'weather_risk',
-  'text_authenticity',
-  'search_relevance',
-  'language_response',
-  'multimodal_response',
-  'task_completion',
-] as const;
-
 // Canonical intents registered on-chain — UPPER_SNAKE_CASE as the registry expects
 export const CANONICAL_INTENTS = [
   'CHAT_COMPLETION',
+  'LANGUAGE_GENERATION',
   'TASK_COMPLETION',
   'AGENT_TASK',
   'WEB_SEARCH',
-  'IMAGE_GENERATION',
-  'IMAGE_VERIFICATION',
-  'VIDEO_VERIFICATION',
   'WEATHER_CHECK',
   'WEATHER_FORECAST',
   'WEATHER_RISK_ASSESSMENT',
   'STORM_ALERT',
   'DEEPFAKE_DETECTION',
+  'IMAGE_VERIFICATION',
+  'VIDEO_VERIFICATION',
   'MEDIA_AUTHENTICITY_CHECK',
   'AI_DETECTION',
+  'TELEGRAPH_KNOWLEDGE',
+  'TEXT_GENERATION',
+  'HIGH_PERFORMANCE_INFERENCE',
+  'CONTENT_MODERATION',
+  'MULTIMODAL_INFERENCE',
+  'IMAGE_GENERATION',
+  'TEXT_TO_IMAGE',
+  'TWITTER_SEARCH',
+  'NEWS_SEARCH',
+  'RESEARCH_SYNTHESIS',
+  'FACT_CHECK',
+  'TEXT_AUTHENTICITY_CHECK',
+  'CONTENT_VERIFICATION',
 ] as const;
 
 export type CanonicalIntent = typeof CANONICAL_INTENTS[number];

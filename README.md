@@ -27,7 +27,7 @@ Create a `.env.local` file in the project root:
 ```bash
 PINATA_API_KEY=your_pinata_api_key
 PINATA_API_SECRET=your_pinata_api_secret
-NEXT_PUBLIC_REGISTRY_CONTRACT=0x122396E8602BEed349434AA6E83123E7dD97F5A0
+NEXT_PUBLIC_REGISTRY_CONTRACT=0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 ```
 
@@ -115,8 +115,8 @@ Applies to all three paths once you reach the Register On-Chain screen.
 | | |
 |---|---|
 | Network | Base Sepolia (chain ID 84532) |
-| Address | `0x122396E8602BEed349434AA6E83123E7dD97F5A0` |
-| Explorer | [sepolia.basescan.org](https://sepolia.basescan.org/address/0x122396E8602BEed349434AA6E83123E7dD97F5A0) |
+| Address | `0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3` |
+| Explorer | [sepolia.basescan.org](https://sepolia.basescan.org/address/0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3) |
 
 ---
 

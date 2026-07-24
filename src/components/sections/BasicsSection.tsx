@@ -126,6 +126,60 @@ export default function BasicsSection({ state, set }: Props) {
           onChange={e => set('description', e.target.value)}
         />
       </div>
+
+      <div className="section-divider"><span>Docs (optional)</span></div>
+
+      <div className="field-row-2">
+        <div className="field-group">
+          <label className="field-label">Website</label>
+          <input
+            className="field-input field-mono"
+            placeholder="https://example.com"
+            value={state.docs_website}
+            onChange={e => set('docs_website', e.target.value)}
+          />
+        </div>
+        <div className="field-group">
+          <label className="field-label">Documentation</label>
+          <input
+            className="field-input field-mono"
+            placeholder="https://docs.example.com"
+            value={state.docs_documentation}
+            onChange={e => set('docs_documentation', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="field-row-2">
+        <div className="field-group">
+          <label className="field-label">Repository</label>
+          <input
+            className="field-input field-mono"
+            placeholder="https://github.com/org/repo"
+            value={state.docs_repository}
+            onChange={e => set('docs_repository', e.target.value)}
+          />
+        </div>
+        <div className="field-group">
+          <label className="field-label">Twitter</label>
+          <input
+            className="field-input field-mono"
+            placeholder="https://x.com/handle"
+            value={state.docs_twitter}
+            onChange={e => set('docs_twitter', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="field-group">
+        <label className="field-label">Discord</label>
+        <input
+          className="field-input field-mono"
+          placeholder="https://discord.gg/invite"
+          value={state.docs_discord}
+          onChange={e => set('docs_discord', e.target.value)}
+        />
+      </div>
     </div>
   );
 }

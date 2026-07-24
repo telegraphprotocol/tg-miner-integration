@@ -106,6 +106,25 @@ export default function ConnectionSection({ state, set }: Props) {
         </div>
       )}
 
+      {state.auth_type !== 'none' && (
+        <div className="field-group">
+          <label className="field-label">
+            Value Prefix
+            <Tooltip lines={[
+              'Prefix prepended to the key value when injected into the header.',
+              `Defaults to <strong>"Bearer "</strong> for bearer auth, empty otherwise.`,
+              'e.g. <strong>APIKey </strong> or <strong>Token </strong>',
+            ]} />
+          </label>
+          <input
+            className="field-input field-mono"
+            placeholder="Bearer "
+            value={state.auth_value_prefix}
+            onChange={e => set('auth_value_prefix', e.target.value)}
+          />
+        </div>
+      )}
+
       <div className="section-divider">
         <span>Rate Limits & Resilience</span>
       </div>

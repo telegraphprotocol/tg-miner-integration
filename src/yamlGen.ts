@@ -1,4 +1,4 @@
-import type { FormState, OnChainFieldItem, OnChainRequestItem } from './types';
+import type { FormState, OnChainFieldItem, OnChainRequestItem, LimitationItem } from './types';
 import { schemaFieldsToJson } from './schemaUtils';
 
 const i2 = (s: string) => s.split('\n').map(l => `  ${l}`).join('\n');
@@ -10,6 +10,21 @@ function blockOrInline(text: string, baseIndent: string): string {
     return `>\n${lines.map(l => `${baseIndent}  ${l}`).join('\n')}`;
   }
   return text;
+}
+
+function renderLimitations(items: LimitationItem[]): string {
+  if (!items.length) return '';
+  const rows = items.map(l => {
+    let block = `  - code: ${l.code}\n`;
+    block += `    message: ${blockOrInline(l.message || '', '    ')}\n`;
+    if (l.param) block += `    param: ${l.param}\n`;
+    if (l.property) block += `    property: ${l.property}\n`;
+    if (l.value_bytes) block += `    value_bytes: ${l.value_bytes}\n`;
+    if (l.value_num) block += `    value_num: ${l.value_num}\n`;
+    if (l.operator) block += `    operator: ${l.operator}\n`;
+    return block;
+  });
+  return `limitations:\n${rows.join('')}`;
 }
 
 function renderOnChainFields(items: OnChainFieldItem[], type: string): string {
@@ -80,12 +95,32 @@ export function generateYaml(s: FormState): string {
   if (s.base_url) lines.push(`base_url: ${s.base_url}`);
   lines.push('');
 
+  // Docs
+  const hasDocs = s.docs_website || s.docs_documentation || s.docs_repository || s.docs_twitter || s.docs_discord;
+  if (hasDocs) {
+    lines.push(`docs:`);
+    if (s.docs_website) lines.push(`  website: ${s.docs_website}`);
+    if (s.docs_documentation) lines.push(`  documentation: ${s.docs_documentation}`);
+    if (s.docs_repository) lines.push(`  repository: ${s.docs_repository}`);
+    if (s.docs_twitter) lines.push(`  twitter: ${s.docs_twitter}`);
+    if (s.docs_discord) lines.push(`  discord: ${s.docs_discord}`);
+    lines.push('');
+  }
+
+  // Limitations
+  const limitationBlock = renderLimitations(s.limitations);
+  if (limitationBlock) {
+    lines.push(limitationBlock.trimEnd());
+    lines.push('');
+  }
+
   // Auth
   if (s.auth_type && s.auth_type !== 'none') {
     lines.push(`auth:`);
     lines.push(`  type: ${s.auth_type}`);
     if (s.auth_env_var) lines.push(`  env_var: ${s.auth_env_var}`);
     if (s.auth_header_name) lines.push(`  header_name: ${s.auth_header_name}`);
+    if (s.auth_value_prefix) lines.push(`  value_prefix: ${s.auth_value_prefix}`);
     lines.push('');
   } else if (s.auth_type === 'none') {
     lines.push(`auth:`);
@@ -155,12 +190,12 @@ export function generateYaml(s: FormState): string {
   }
 
   // Semantics
-  const hasSemantics = s.semantics_signal_type || s.semantics_intents.filter(Boolean).length;
+  const hasSignalMapping = s.semantics_confidence_field || s.semantics_label_field || s.semantics_reason_field;
+  const hasSemantics = hasSignalMapping || s.semantics_intents.filter(Boolean).length;
   if (hasSemantics) {
     lines.push(`semantics:`);
-    if (s.semantics_signal_type) {
+    if (hasSignalMapping) {
       lines.push(`  signal_mapping:`);
-      lines.push(`    type: ${s.semantics_signal_type}`);
       if (s.semantics_confidence_field) lines.push(`    confidence_field: ${s.semantics_confidence_field}`);
       if (s.semantics_label_field) lines.push(`    label_field: ${s.semantics_label_field}`);
       if (s.semantics_reason_field) lines.push(`    reason_field: ${s.semantics_reason_field}`);
@@ -187,7 +222,7 @@ export function generateYaml(s: FormState): string {
     }
     if (s.onchain_min_price_usdc) lines.push(`  min_price_usdc: ${s.onchain_min_price_usdc}`);
 
-    const hasFields = s.onchain_strings.length || s.onchain_integers.length || s.onchain_bools.length || s.onchain_addresses.length;
+    const hasFields = s.onchain_strings.length || s.onchain_integers.length || s.onchain_bools.length;
     if (hasFields) {
       lines.push(`  fields:`);
       if (s.onchain_strings.length) {
@@ -200,10 +235,6 @@ export function generateYaml(s: FormState): string {
       }
       if (s.onchain_bools.length) {
         const block = renderOnChainFields(s.onchain_bools, 'bools');
-        if (block) lines.push(block.trimEnd());
-      }
-      if (s.onchain_addresses.length) {
-        const block = renderOnChainFields(s.onchain_addresses, 'addresses');
         if (block) lines.push(block.trimEnd());
       }
     }

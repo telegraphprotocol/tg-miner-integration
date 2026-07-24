@@ -17,10 +17,18 @@ export const DEFAULT_FORM: FormState = {
   auth_type: 'bearer',
   auth_env_var: '',
   auth_header_name: '',
+  auth_value_prefix: '',
+
+  docs_website: '',
+  docs_documentation: '',
+  docs_repository: '',
+  docs_twitter: '',
+  docs_discord: '',
+
+  limitations: [],
 
   endpoints: [],
 
-  semantics_signal_type: '',
   semantics_confidence_field: '',
   semantics_label_field: '',
   semantics_reason_field: '',
@@ -34,7 +42,6 @@ export const DEFAULT_FORM: FormState = {
   onchain_strings: [],
   onchain_integers: [],
   onchain_bools: [],
-  onchain_addresses: [],
   onchain_request: [],
 
   polling_interval_seconds: '',
