@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import type { FormState, EndpointItem, OnChainFieldItem, OnChainRequestItem, OnChainBodyField } from './types';
+import type { FormState, EndpointItem, OnChainFieldItem, OnChainRequestItem, OnChainBodyField, LimitationItem } from './types';
 import { DEFAULT_FORM, uid } from './formState';
 import { schemaJsonToFields } from './schemaUtils';
 
@@ -17,6 +17,20 @@ function parseFieldItems(arr: unknown): OnChainFieldItem[] {
     source_path: str(item.source_path),
     multiplier: item.multiplier != null ? str(item.multiplier) : '',
     transform_rule: str(item.transform_rule),
+  }));
+}
+
+function parseLimitations(arr: unknown): LimitationItem[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item: Record<string, unknown>) => ({
+    _id: uid(),
+    code: str(item.code),
+    message: str(item.message),
+    param: str(item.param),
+    property: str(item.property),
+    value_bytes: item.value_bytes != null ? str(item.value_bytes) : '',
+    value_num: item.value_num != null ? str(item.value_num) : '',
+    operator: str(item.operator),
   }));
 }
 
@@ -46,6 +60,7 @@ export function parseYamlToForm(yamlStr: string): FormState {
 
   const auth = (doc.auth ?? {}) as Record<string, unknown>;
   const polling = (doc.polling ?? {}) as Record<string, unknown>;
+  const docsBlock = (doc.docs ?? {}) as Record<string, unknown>;
   const semantics = (doc.semantics ?? {}) as Record<string, unknown>;
   const signalMapping = (semantics.signal_mapping ?? {}) as Record<string, unknown>;
   const onchain = (doc.on_chain ?? {}) as Record<string, unknown>;
@@ -118,10 +133,18 @@ export function parseYamlToForm(yamlStr: string): FormState {
     auth_type: str(auth.type) || 'bearer',
     auth_env_var: str(auth.env_var),
     auth_header_name: str(auth.header_name),
+    auth_value_prefix: str(auth.value_prefix),
+
+    docs_website: str(docsBlock.website),
+    docs_documentation: str(docsBlock.documentation),
+    docs_repository: str(docsBlock.repository),
+    docs_twitter: str(docsBlock.twitter),
+    docs_discord: str(docsBlock.discord),
+
+    limitations: parseLimitations(doc.limitations),
 
     endpoints,
 
-    semantics_signal_type: str(signalMapping.type),
     semantics_confidence_field: str(signalMapping.confidence_field),
     semantics_label_field: str(signalMapping.label_field),
     semantics_reason_field: str(signalMapping.reason_field),
@@ -137,7 +160,6 @@ export function parseYamlToForm(yamlStr: string): FormState {
     onchain_strings: parseFieldItems(fields.strings),
     onchain_integers: parseFieldItems(fields.integers),
     onchain_bools: parseFieldItems(fields.bools),
-    onchain_addresses: parseFieldItems(fields.addresses),
     onchain_request: onchainRequest,
 
     polling_interval_seconds: polling.interval_seconds != null ? str(polling.interval_seconds) : '',

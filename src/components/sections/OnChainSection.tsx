@@ -10,12 +10,11 @@ interface Props {
   set: (key: keyof FormState, value: unknown) => void;
 }
 
-type ArrayKey = 'onchain_strings' | 'onchain_integers' | 'onchain_bools' | 'onchain_addresses';
+type ArrayKey = 'onchain_strings' | 'onchain_integers' | 'onchain_bools';
 const ARRAY_TABS: { key: ArrayKey; label: string; hint: string }[] = [
   { key: 'onchain_strings',   label: 'strings[]',   hint: 'String values extracted from the API response' },
   { key: 'onchain_integers',  label: 'integers[]',  hint: 'Integer/fixed-point values (use multiplier to encode decimals)' },
   { key: 'onchain_bools',     label: 'bools[]',     hint: 'Boolean values extracted from the API response' },
-  { key: 'onchain_addresses', label: 'addresses[]', hint: 'EVM address values extracted from the API response' },
 ];
 
 function PlusIcon() {
@@ -137,10 +136,6 @@ function buildOnchainSourceSuggestions(state: FormState): { value: string; label
   });
   state.onchain_bools.forEach((f, i) => {
     const v = `bools.${i}`;
-    result.push({ value: v, label: f.name ? `${v} — ${f.name}` : v });
-  });
-  state.onchain_addresses.forEach((f, i) => {
-    const v = `addresses.${i}`;
     result.push({ value: v, label: f.name ? `${v} — ${f.name}` : v });
   });
   return result;
@@ -366,7 +361,7 @@ export default function OnChainSection({ state, set }: Props) {
               <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <span>
-              <strong>Data flow:</strong> API response → on-chain fields (source paths) → contract storage (strings/integers/bools/addresses) → request mappings (re-injected as API inputs).
+              <strong>Data flow:</strong> API response → on-chain fields (source paths) → contract storage (strings/integers/bools) → request mappings (re-injected as API inputs).
               Define your output schema in the <em>Advanced</em> section to get source path suggestions here.
             </span>
           </div>
