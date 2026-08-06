@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
 import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
+import { useToast } from './Toast';
+import { addYamlRegistration } from '../registrationsStore';
 
 const REGISTRY_ABI = [
   {
@@ -55,6 +57,7 @@ interface Props {
 }
 
 export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack }: Props) {
+  const toast = useToast();
   const { address, isConnected, chain } = useAccount();
 
   const [mode, setMode] = useState<Mode>(pinataResult ? 'auto' : 'manual');
@@ -106,6 +109,29 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
   const canSubmit    = isConnected && !wrongNetwork && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+
+  const toastedTxRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isSuccess && txHash && toastedTxRef.current !== txHash) {
+      toastedTxRef.current = txHash;
+      toast.success('Miner registered on-chain successfully.');
+      if (address) {
+        addYamlRegistration(address, {
+          yamlUrl: effectiveUrl,
+          yamlHash: effectiveHash,
+          feeAddress,
+          minPriceUsdc: minPrice,
+          intents: effectiveIntents,
+          txHash,
+          registeredAt: new Date().toISOString(),
+        });
+      }
+    }
+  }, [isSuccess, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents]);
+
+  useEffect(() => {
+    if (txError) toast.error(txError.message?.split('\n')[0] ?? 'Transaction failed.');
+  }, [txError, toast]);
 
   const handleRegister = () => {
     if (!canSubmit) return;
@@ -202,12 +228,24 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
           {!isConnected ? (
             <div className="wallet-disconnected">
               <p className="wallet-disconnected-text">Connect your wallet to proceed.</p>
-              <ConnectButton />
+              <ConnectButton.Custom>
+                {({ openConnectModal }) => (
+                  <button type="button" className="wallet-pill wallet-pill-primary" onClick={openConnectModal}>
+                    Connect Wallet
+                  </button>
+                )}
+              </ConnectButton.Custom>
             </div>
           ) : wrongNetwork ? (
             <div className="wallet-disconnected">
               <p className="wallet-disconnected-text">Switch to Base Sepolia to continue.</p>
-              <ConnectButton />
+              <ConnectButton.Custom>
+                {({ openChainModal }) => (
+                  <button type="button" className="wallet-pill wallet-pill-danger" onClick={openChainModal}>
+                    Wrong Network
+                  </button>
+                )}
+              </ConnectButton.Custom>
             </div>
           ) : (
             <div className="wallet-info">
