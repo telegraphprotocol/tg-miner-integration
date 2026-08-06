@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { PinataResult } from '../types';
 import YamlPreview from './YamlPreview';
+import { useToast } from './Toast';
 
 interface ValidationResult {
   path: string;
@@ -34,6 +35,7 @@ interface Props {
 type UploadState = 'idle' | 'validating' | 'uploading' | 'done' | 'error';
 
 export default function PinataUpload({ yaml, name, result, onResult, onBack, onNext }: Props) {
+  const toast = useToast();
   const [state, setState] = useState<UploadState>(result ? 'done' : 'idle');
   const [apiKey, setApiKey] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -70,11 +72,14 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
       if (!vData.valid) {
         setValidationErrors(vData.errors ?? ['Unknown validation error']);
         setState('error');
+        toast.error('YAML validation failed — see details below.');
         return;
       }
     } catch (err) {
-      setErrorMsg((err as Error).message ?? 'YAML validation request failed.');
+      const message = (err as Error).message ?? 'YAML validation request failed.';
+      setErrorMsg(message);
       setState('error');
+      toast.error(message);
       return;
     }
 
@@ -90,16 +95,20 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(data.error || 'Upload failed. Please try again.');
+        const message = data.error || 'Upload failed. Please try again.';
+        setErrorMsg(message);
         setState('error');
+        toast.error(message);
         return;
       }
 
       onResult(data as PinataResult);
       setState('done');
+      toast.success('Pinned to IPFS successfully.');
     } catch {
       setErrorMsg('Network error. Please try again.');
       setState('error');
+      toast.error('Network error. Please try again.');
     }
   };
 

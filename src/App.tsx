@@ -8,13 +8,17 @@ import YamlWizard from './components/YamlWizard';
 import PinataUpload from './components/PinataUpload';
 import ContractRegister from './components/ContractRegister';
 import ImportModal from './components/ImportModal';
+import Dashboard from './components/Dashboard';
+import WasmWizard from './components/WasmWizard';
+import { ToastProvider, useToast } from './components/Toast';
 import { DEFAULT_FORM } from './formState';
 import type { Step, FormState, PinataResult } from './types';
 import { generateYaml } from './yamlGen';
 
-type View = 'landing' | 'app';
+type View = 'landing' | 'app' | 'dashboard' | 'wasm';
 
-export default function App() {
+function AppInner() {
+  const toast = useToast();
   const [view, setView] = useState<View>('landing');
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormState>(DEFAULT_FORM);
@@ -22,7 +26,6 @@ export default function App() {
   const [showImport, setShowImport] = useState(false);
   // tracks where to land after import: wizard (step 1) or upload (step 2)
   const [importTarget, setImportTarget] = useState<1 | 2>(1);
-  const [importBanner, setImportBanner] = useState('');
 
   const handleChange = (key: keyof FormState, value: unknown) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -33,8 +36,7 @@ export default function App() {
     setShowImport(false);
     setStep(importTarget);
     setView('app');
-    setImportBanner(`YAML imported — "${imported.name || imported.slug || 'untitled'}" loaded.`);
-    setTimeout(() => setImportBanner(''), 4000);
+    toast.success(`YAML imported — "${imported.name || imported.slug || 'untitled'}" loaded.`);
   };
 
   // Option 1: Create from scratch
@@ -68,25 +70,39 @@ export default function App() {
           onCreate={handleCreate}
           onImportToUpload={handleImportToUpload}
           onRegisterDirect={handleRegisterDirect}
+          onOpenDashboard={() => setView('dashboard')}
+          onRegisterWasm={() => setView('wasm')}
         />
         {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
       </>
     );
   }
 
+  if (view === 'dashboard') {
+    return (
+      <>
+        <AppBackground />
+        <Dashboard onGoHome={() => setView('landing')} />
+      </>
+    );
+  }
+
+  if (view === 'wasm') {
+    return (
+      <div className="app">
+        <AppBackground />
+        <Header onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} />
+        <div className="app-body">
+          <WasmWizard onBack={() => setView('landing')} onDone={() => setView('dashboard')} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <AppBackground />
-      <Header step={step} onGoHome={() => setView('landing')} />
-
-      {importBanner && (
-        <div className="import-banner">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          {importBanner}
-        </div>
-      )}
+      <Header step={step} onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} />
 
       <div className="app-body">
         {step === 1 && (
@@ -115,5 +131,13 @@ export default function App() {
 
       {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
   );
 }
