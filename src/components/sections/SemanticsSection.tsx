@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import type { FormState } from '../../types';
-import { CANONICAL_INTENTS } from '../../types';
+import { useCanonicalIntents } from '../../hooks/useCanonicalIntents';
+import IntentSearchList from '../IntentSearchList';
 
 interface Props {
   state: FormState;
@@ -18,6 +19,7 @@ function TrashIcon() {
 
 export default function SemanticsSection({ state, set }: Props) {
   const [newIntent, setNewIntent] = useState('');
+  const { intents: canonicalIntents, isLoading: intentsLoading, error: intentsError } = useCanonicalIntents();
 
   const normalizeIntent = (v: string) => v.trim().toUpperCase().replace(/\s+/g, '_');
 
@@ -35,8 +37,6 @@ export default function SemanticsSection({ state, set }: Props) {
     if (state.semantics_intents.includes(intent)) return;
     set('semantics_intents', [...state.semantics_intents, intent]);
   };
-
-  const unusedCanonicals = CANONICAL_INTENTS.filter(i => !state.semantics_intents.includes(i));
 
   return (
     <div className="section-fields">
@@ -94,7 +94,7 @@ export default function SemanticsSection({ state, set }: Props) {
       <p className="section-desc-sm">
         Declare which tasks this integration can fulfill. The engine builds a{' '}
         <code className="inline-code">providersByIntent</code> routing map at startup.
-        Use UPPER_SNAKE_CASE. Click a canonical intent to add it, or type a custom one.
+        Search the canonical intents registered on-chain to add one, or type a custom one.
       </p>
 
       {/* Added intents */}
@@ -111,27 +111,19 @@ export default function SemanticsSection({ state, set }: Props) {
 
       {state.semantics_intents.length === 0 && (
         <p className="field-hint" style={{ marginTop: '8px' }}>
-          No intents added yet. Click a canonical intent below or type a custom one.
+          No intents added yet. Search below to add a canonical intent, or type a custom one.
         </p>
       )}
 
-      {/* Canonical intent picker */}
-      {unusedCanonicals.length > 0 && (
-        <div className="intent-canonical-grid">
-          {unusedCanonicals.map(intent => (
-            <button
-              key={intent}
-              type="button"
-              className="intent-canonical-btn"
-              onClick={() => addCanonical(intent)}
-              title="Click to add"
-            >
-              <PlusIcon />
-              {intent}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Canonical intent picker — sourced live from the registry contract */}
+      <IntentSearchList
+        intents={canonicalIntents}
+        isLoading={intentsLoading}
+        error={intentsError}
+        excluded={state.semantics_intents}
+        onSelect={addCanonical}
+        placeholder="Search canonical intents…"
+      />
 
       {/* Custom intent input */}
       <div className="intent-add-row">

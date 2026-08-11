@@ -15,9 +15,11 @@ import {
   intentRegistryAbi,
 } from '../wasmAbi';
 import { addWasmRegistration } from '../registrationsStore';
+import { useCanonicalIntents } from '../hooks/useCanonicalIntents';
 import { useToast } from './Toast';
 import WalletBar from './WalletBar';
 import Spinner from './Spinner';
+import IntentSearchList from './IntentSearchList';
 
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
 
@@ -40,11 +42,12 @@ export default function WasmWizard({ onBack, onDone }: Props) {
   const [uploading, setUploading] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState('');
-  const [whitelistedUrlsRaw, setWhitelistedUrlsRaw] = useState('');
+  const [selectedIntents, setSelectedIntents] = useState<string[]>([]);
 
   const [result, setResult] = useState<{ registrationId: string; intentId: string } | null>(null);
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
+  const { intents: canonicalIntents, isLoading: intentsLoading, error: intentsError } = useCanonicalIntents();
 
   const {
     writeContract: writeRegister,
@@ -73,7 +76,7 @@ export default function WasmWizard({ onBack, onDone }: Props) {
             intentId,
             wasmUrl: gatewayUrl,
             wasmHash: localHash,
-            whitelistedUrls: whitelistedUrlsRaw.split(',').map(s => s.trim()).filter(Boolean),
+            intents: selectedIntents,
             txHash: registerHash ?? '',
             registeredAt: new Date().toISOString(),
           });
@@ -83,7 +86,7 @@ export default function WasmWizard({ onBack, onDone }: Props) {
         toast.error('Registered, but could not parse the registration event. Check BaseScan.');
       }
     }
-  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, whitelistedUrlsRaw, registerHash, toast]);
+  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, selectedIntents, registerHash, toast]);
 
   useEffect(() => {
     if (registerError) toast.error(friendlyRevertMessage(registerError.message ?? 'Transaction failed.'));
@@ -149,12 +152,11 @@ export default function WasmWizard({ onBack, onDone }: Props) {
 
   const handleRegister = () => {
     resetRegister();
-    const whitelistedUrls = whitelistedUrlsRaw.split(',').map(s => s.trim()).filter(Boolean);
     writeRegister({
       address: DIAMOND_ADDRESS,
       abi: intentRegistryAbi,
       functionName: 'registerWasm',
-      args: [localHash as `0x${string}`, gatewayUrl, whitelistedUrls],
+      args: [localHash as `0x${string}`, gatewayUrl, []],
     });
   };
 
@@ -188,6 +190,12 @@ export default function WasmWizard({ onBack, onDone }: Props) {
               <span className="result-row-label">INTENT ID</span>
               <span className="result-row-value result-mono result-truncate">{result.intentId}</span>
             </div>
+            {selectedIntents.length > 0 && (
+              <div className="wallet-info-row">
+                <span className="result-row-label">SERVES INTENTS</span>
+                <span className="result-row-value">{selectedIntents.join(', ')}</span>
+              </div>
+            )}
             {registerHash && (
               <div className="tx-hash-row">
                 <span className="result-row-label">TX HASH</span>
@@ -291,28 +299,40 @@ export default function WasmWizard({ onBack, onDone }: Props) {
       {phase === 'verified' && (
         <>
           <div className="register-card register-card-full">
-            <div className="register-card-header"><span>4. Whitelisted URLs (optional)</span></div>
-            <div className="field-group">
-              <label className="field-label">
-                Comma-separated URLs
-                <span className="field-tooltip-wrap">
-                  <span className="field-tooltip-icon">?</span>
-                  <span className="field-tooltip-popup">
-                    <span className="field-tooltip-line">
-                      Declarative metadata only — the runtime does not enforce this. Safe to leave empty.
-                    </span>
-                  </span>
-                </span>
-              </label>
-              <input
-                className="field-input"
-                type="text"
-                placeholder="(optional)"
-                value={whitelistedUrlsRaw}
-                onChange={e => setWhitelistedUrlsRaw(e.target.value)}
-                disabled={isRegisterInFlight}
-              />
+            <div className="register-card-header">
+              <span>4. Intents This Module Serves</span>
+              {selectedIntents.length > 0 && <span className="badge-success">✓ {selectedIntents.length} SELECTED</span>}
             </div>
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              Which canonical intents is this scorer meant to evaluate? Select one or more. Sourced live
+              from the registry contract so they can never drift out of sync or be mis-spelled.
+            </p>
+
+            {selectedIntents.length > 0 && (
+              <div className="intent-list" style={{ marginBottom: 12 }}>
+                {selectedIntents.map(intent => (
+                  <div key={intent} className="intent-chip">
+                    <span>{intent}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedIntents(prev => prev.filter(i => i !== intent))}
+                      className="intent-remove"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <IntentSearchList
+              intents={canonicalIntents}
+              isLoading={intentsLoading}
+              error={intentsError}
+              excluded={selectedIntents}
+              onSelect={intent => setSelectedIntents(prev => [...prev, intent])}
+              placeholder="Search canonical intents…"
+            />
           </div>
 
           <div className="register-grid">
@@ -349,6 +369,8 @@ export default function WasmWizard({ onBack, onDone }: Props) {
 
               {!isConnected || wrongNetwork ? (
                 <p className="field-hint">Connect your wallet and switch to Base Sepolia to continue.</p>
+              ) : selectedIntents.length === 0 ? (
+                <p className="field-hint">Select at least one intent this module serves above to continue.</p>
               ) : isRegisterInFlight ? (
                 <div className="tx-pending">
                   <div className="tx-pending-inner">

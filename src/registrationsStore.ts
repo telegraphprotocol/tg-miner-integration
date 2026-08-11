@@ -3,7 +3,7 @@ export interface WasmRegistrationRecord {
   intentId: string;
   wasmUrl: string;
   wasmHash: string;
-  whitelistedUrls: string[];
+  intents: string[];
   txHash: string;
   registeredAt: string;
   deregistered?: boolean;

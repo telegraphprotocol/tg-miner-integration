@@ -53,6 +53,16 @@ export const intentRegistryAbi = [
     ],
   },
   {
+    type: 'function',
+    name: 'getCanonicalIntentsWithDescriptions',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: 'intents', type: 'string[]' },
+      { name: 'descriptions', type: 'string[]' },
+    ],
+  },
+  {
     type: 'event',
     name: 'IntentRegistered',
     inputs: [
@@ -76,6 +86,7 @@ export const intentRegistryAbi = [
 ] as const;
 
 export const DIAMOND_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? '') as `0x${string}`;
+export const ENTITY_MINER = 1;
 export const ENTITY_WASM_AUTHOR = 2;
 
 export const TELEGRAPH_NODE_URL = process.env.NEXT_PUBLIC_TELEGRAPH_NODE_URL ?? 'http://13.237.89.59:7044';
@@ -99,6 +110,52 @@ export interface WasmIntentResponse {
   intent_id: string;
   count: number;
   wasm: WasmRecordApi[];
+}
+
+export interface MinerRecordApi {
+  RegistrationID: number;
+  MinerAddress: string;
+  YamlURL: string;
+  YamlHash: string;
+  Slug: string;
+  ActivationStatus: 'pending' | 'active' | 'rejected' | 'superseded' | 'deregistered' | string;
+  IntentID: string;
+  FeeAddress: string;
+  MinPriceUsdc: number;
+  SupportedIntents: string[];
+  RegisteredAt: string;
+  UpdatedAt: string;
+}
+
+export interface AddressBundleResponse {
+  address: string;
+  miners: MinerRecordApi[];
+  miner_count: number;
+  wasm: WasmRecordApi[];
+  wasm_count: number;
+}
+
+export interface LeaderboardEntry {
+  miner_slug: string;
+  /** Only present on entries from GET /leaderboard/miners — the by-intent breakdown omits it. */
+  activation_status?: 'pending' | 'active' | 'rejected' | 'superseded' | 'deregistered' | string;
+  avg_score: number | null;
+  best_rank: number | null;
+  epochs_participated: number;
+  total_requests_served: number;
+  position: number;
+}
+
+export interface LeaderboardResponse {
+  entries: LeaderboardEntry[];
+  epoch_start: number;
+  epoch_end: number;
+}
+
+export interface LeaderboardByIntentResponse {
+  intents: Record<string, LeaderboardEntry[]>;
+  epoch_start: number;
+  epoch_end: number;
 }
 
 export const REVERT_MESSAGES: Record<string, string> = {

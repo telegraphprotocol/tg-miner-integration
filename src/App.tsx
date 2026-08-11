@@ -10,12 +10,13 @@ import ContractRegister from './components/ContractRegister';
 import ImportModal from './components/ImportModal';
 import Dashboard from './components/Dashboard';
 import WasmWizard from './components/WasmWizard';
+import IntegrationHub from './components/IntegrationHub';
 import { ToastProvider, useToast } from './components/Toast';
 import { DEFAULT_FORM } from './formState';
 import type { Step, FormState, PinataResult } from './types';
 import { generateYaml } from './yamlGen';
 
-type View = 'landing' | 'app' | 'dashboard' | 'wasm';
+type View = 'landing' | 'app' | 'dashboard' | 'wasm' | 'integrate';
 
 function AppInner() {
   const toast = useToast();
@@ -72,8 +73,21 @@ function AppInner() {
           onRegisterDirect={handleRegisterDirect}
           onOpenDashboard={() => setView('dashboard')}
           onRegisterWasm={() => setView('wasm')}
+          onOpenIntegrate={() => setView('integrate')}
         />
         {showImport && <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />}
+      </>
+    );
+  }
+
+  if (view === 'integrate') {
+    return (
+      <>
+        <AppBackground />
+        <IntegrationHub
+          onGoHome={() => setView('landing')}
+          onOpenDashboard={() => setView('dashboard')}
+        />
       </>
     );
   }

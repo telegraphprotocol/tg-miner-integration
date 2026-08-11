@@ -10,6 +10,7 @@ interface Props {
   onRegisterDirect: () => void;
   onOpenDashboard: () => void;
   onRegisterWasm: () => void;
+  onOpenIntegrate: () => void;
 }
 
 const CARDS = [
@@ -46,6 +47,7 @@ const ROOT_CARDS = [
     desc: 'Describe an inference node with a YAML config, pin it to IPFS, and register it on-chain.',
     cta: 'Continue →',
     tags: ['Miner', 'Available now'],
+    gated: true,
   },
   {
     key: 'wasm',
@@ -53,12 +55,21 @@ const ROOT_CARDS = [
     desc: 'Publish a candidate scoring module and register it on-chain against a bond.',
     cta: 'Continue →',
     tags: ['WASM', 'Available now'],
+    gated: true,
+  },
+  {
+    key: 'integrate',
+    title: 'Integrate & Compete',
+    desc: 'Point your API at the benchmark, get ranked on the leaderboard, and see how to consume Telegraph from your own agents.',
+    cta: 'Explore →',
+    tags: ['Leaderboard', 'MCP · WebSocket'],
+    gated: false,
   },
 ] as const;
 
 type Choice = 'root' | 'yaml';
 
-export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onRegisterWasm }: Props) {
+export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onRegisterWasm, onOpenIntegrate }: Props) {
   const { isConnected } = useAccount();
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -67,6 +78,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
   const rootHandlers: Record<string, () => void> = {
     yaml: () => setChoice('yaml'),
     wasm: onRegisterWasm,
+    integrate: onOpenIntegrate,
   };
 
   const handlers: Record<string, () => void> = {
@@ -142,12 +154,14 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
               <p className="lv2-connect-hint">Connect your wallet above to start registering.</p>
             )}
             <div className="lv2-cards lv2-cards-root">
-              {ROOT_CARDS.map(card => (
+              {ROOT_CARDS.map(card => {
+                const locked = card.gated && !isConnected;
+                return (
                 <button
                   key={card.key}
                   type="button"
-                  className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${!isConnected ? ' lv2-card-disabled' : ''}`}
-                  disabled={!isConnected}
+                  className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${locked ? ' lv2-card-disabled' : ''}`}
+                  disabled={locked}
                   onClick={rootHandlers[card.key]}
                   onMouseEnter={() => setHovered(card.key)}
                   onMouseLeave={() => setHovered(null)}
@@ -166,7 +180,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
 
                   <div className="lv2-card-cta">
                     {card.cta}
-                    {isConnected && (
+                    {!locked && (
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                         <line x1="5" y1="12" x2="19" y2="12"/>
                         <polyline points="12 5 19 12 12 19"/>
@@ -174,7 +188,8 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
                     )}
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

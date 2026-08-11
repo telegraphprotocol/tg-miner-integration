@@ -1,23 +1,18 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import WalletBar from './WalletBar';
 import Spinner from './Spinner';
 import { useToast } from './Toast';
-import {
-  getWasmRegistrations,
-  getYamlRegistrations,
-  markWasmDeregistered,
-  type WasmRegistrationRecord,
-  type YamlRegistrationRecord,
-} from '../registrationsStore';
+import { useAddressRegistrations } from '../hooks/useAddressRegistrations';
 import {
   DIAMOND_ADDRESS,
+  ENTITY_MINER,
   ENTITY_WASM_AUTHOR,
-  TELEGRAPH_NODE_URL,
   friendlyRevertMessage,
   intentRegistryAbi,
+  type MinerRecordApi,
   type WasmRecordApi,
 } from '../wasmAbi';
 
@@ -27,7 +22,6 @@ interface Props {
 
 type Tab = 'wasm' | 'yaml';
 
-const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
 const POLL_INTERVAL_MS = 15000;
 
 function statusBadgeClass(status: string): string {
@@ -36,91 +30,70 @@ function statusBadgeClass(status: string): string {
   return 'wasm-status-pending';
 }
 
-function WasmRow({ record, address, onDeregistered }: {
-  record: WasmRegistrationRecord;
-  address: `0x${string}`;
+function WasmRow({ record, onDeregistered }: {
+  record: WasmRecordApi;
   onDeregistered: () => void;
 }) {
   const toast = useToast();
-  const [live, setLive] = useState<WasmRecordApi | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchStatus = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${TELEGRAPH_NODE_URL}/engine/v1/intents/${record.intentId}/wasm`);
-      if (res.ok) {
-        const data = await res.json();
-        setLive(data.wasm?.[0] ?? null);
-      }
-    } catch {
-      // node unreachable — leave as unknown, keep polling
-    } finally {
-      setLoading(false);
-    }
-  }, [record.intentId]);
-
-  useEffect(() => {
-    fetchStatus();
-    const terminal = live?.ActivationStatus === 'active' || live?.ActivationStatus === 'rejected' || record.deregistered;
-    if (terminal) return;
-    const id = setInterval(fetchStatus, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchStatus, live?.ActivationStatus, record.deregistered]);
-
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
 
   useEffect(() => {
     if (isSuccess) {
-      markWasmDeregistered(address, record.registrationId);
       toast.success('WASM entry deregistered.');
       onDeregistered();
     }
-  }, [isSuccess, address, record.registrationId, toast, onDeregistered]);
+  }, [isSuccess, toast, onDeregistered]);
 
   useEffect(() => {
     if (error) toast.error(friendlyRevertMessage(error.message ?? 'Transaction failed.'));
   }, [error, toast]);
 
-  const status = record.deregistered ? 'deregistered' : (live?.ActivationStatus ?? (loading ? '…' : 'unknown'));
+  const status = record.ActivationStatus;
   const inFlight = isPending || isConfirming;
+  const deregisterable = status !== 'deregistered';
 
   return (
     <div className="reg-row">
       <div className="reg-row-main">
         <div className="reg-row-top">
           <span className={`reg-status-badge ${statusBadgeClass(status)}`}>{status.toUpperCase()}</span>
-          <span className="result-row-value result-mono result-truncate">{record.wasmUrl}</span>
+          <span className="result-row-value result-mono result-truncate">{record.WasmURL}</span>
         </div>
         <div className="reg-row-meta">
-          <span>REG #{record.registrationId}</span>
+          <span>REG #{record.RegistrationID}</span>
           <span className="reg-row-sep">·</span>
-          <span className="result-mono result-truncate">{record.intentId}</span>
+          <span className="result-mono result-truncate">{record.IntentID}</span>
+          {record.WhitelistedURLs?.length > 0 && (
+            <>
+              <span className="reg-row-sep">·</span>
+              <span>{record.WhitelistedURLs.join(', ')}</span>
+            </>
+          )}
           <span className="reg-row-sep">·</span>
-          <span>{new Date(record.registeredAt).toLocaleString()}</span>
+          <span>{new Date(record.RegisteredAt).toLocaleString()}</span>
         </div>
-        {live?.RejectionReason && (
-          <p className="field-error" style={{ marginTop: 6 }}>{live.RejectionReason}</p>
+        {record.RejectionReason && (
+          <p className="field-error" style={{ marginTop: 6 }}>{record.RejectionReason}</p>
         )}
       </div>
       <div className="reg-row-actions">
-        <button type="button" className="btn-ghost" onClick={fetchStatus} disabled={loading}>
-          {loading ? <Spinner /> : 'Refresh'}
+        <button type="button" className="btn-ghost" disabled title="Coming soon">
+          Edit
         </button>
-        {!record.deregistered && (
+        {deregisterable && (
           <button
             type="button"
             className={`btn-ghost reg-danger ${inFlight ? 'btn-loading' : ''}`}
-            disabled={inFlight}
+            disabled
+            title="Deregistration is temporarily disabled"
             onClick={() => {
               reset();
               writeContract({
                 address: DIAMOND_ADDRESS,
                 abi: intentRegistryAbi,
                 functionName: 'deregisterEntity',
-                args: [BigInt(record.registrationId), ENTITY_WASM_AUTHOR],
+                args: [BigInt(record.RegistrationID), ENTITY_WASM_AUTHOR],
               });
             }}
           >
@@ -132,33 +105,71 @@ function WasmRow({ record, address, onDeregistered }: {
   );
 }
 
-function YamlRow({ record }: { record: YamlRegistrationRecord }) {
+function MinerRow({ record, onDeregistered }: {
+  record: MinerRecordApi;
+  onDeregistered: () => void;
+}) {
+  const toast = useToast();
+  const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+
+  useEffect(() => {
+    if (isSuccess) {
+      toast.success('Miner deregistered.');
+      onDeregistered();
+    }
+  }, [isSuccess, toast, onDeregistered]);
+
+  useEffect(() => {
+    if (error) toast.error(friendlyRevertMessage(error.message ?? 'Transaction failed.'));
+  }, [error, toast]);
+
+  const status = record.ActivationStatus;
+  const inFlight = isPending || isConfirming;
+  const deregisterable = status !== 'deregistered';
+
   return (
     <div className="reg-row">
       <div className="reg-row-main">
         <div className="reg-row-top">
-          <span className="badge-success">REGISTERED</span>
-          <span className="result-row-value result-mono result-truncate">{record.yamlUrl}</span>
+          <span className={`reg-status-badge ${statusBadgeClass(status)}`}>{status.toUpperCase()}</span>
+          <span className="result-row-value result-mono result-truncate">{record.YamlURL}</span>
         </div>
         <div className="reg-row-meta">
-          <span>FEE {record.feeAddress.slice(0, 6)}…{record.feeAddress.slice(-4)}</span>
+          <span>REG #{record.RegistrationID}</span>
           <span className="reg-row-sep">·</span>
-          <span>${record.minPriceUsdc} floor</span>
+          <span>FEE {record.FeeAddress?.slice(0, 6)}…{record.FeeAddress?.slice(-4)}</span>
           <span className="reg-row-sep">·</span>
-          <span>{record.intents.join(', ') || 'no intents'}</span>
+          <span>${(record.MinPriceUsdc / 1_000_000).toFixed(2)} floor</span>
           <span className="reg-row-sep">·</span>
-          <span>{new Date(record.registeredAt).toLocaleString()}</span>
+          <span>{record.SupportedIntents?.join(', ') || record.IntentID || 'no intents'}</span>
+          <span className="reg-row-sep">·</span>
+          <span>{new Date(record.RegisteredAt).toLocaleString()}</span>
         </div>
       </div>
       <div className="reg-row-actions">
-        <a
-          className="btn-ghost"
-          href={`${BASE_SEPOLIA_EXPLORER}/tx/${record.txHash}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          View Tx
-        </a>
+        <button type="button" className="btn-ghost" disabled title="Coming soon">
+          Edit
+        </button>
+        {deregisterable && (
+          <button
+            type="button"
+            className={`btn-ghost reg-danger ${inFlight ? 'btn-loading' : ''}`}
+            disabled
+            title="Deregistration is temporarily disabled"
+            onClick={() => {
+              reset();
+              writeContract({
+                address: DIAMOND_ADDRESS,
+                abi: intentRegistryAbi,
+                functionName: 'deregisterEntity',
+                args: [BigInt(record.RegistrationID), ENTITY_MINER],
+              });
+            }}
+          >
+            {inFlight ? <><Spinner /> Deregistering…</> : 'Deregister'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -167,10 +178,16 @@ function YamlRow({ record }: { record: YamlRegistrationRecord }) {
 export default function Dashboard({ onGoHome }: Props) {
   const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>('wasm');
-  const [, forceRefresh] = useState(0);
+  const { miners, wasm, isLoading, error, refetch } = useAddressRegistrations(address);
 
-  const wasmRecords = address ? getWasmRegistrations(address) : [];
-  const yamlRecords = address ? getYamlRegistrations(address) : [];
+  useEffect(() => {
+    if (!isConnected) return;
+    const id = setInterval(refetch, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [isConnected, refetch]);
+
+  const wasmRecords = wasm;
+  const yamlRecords = miners;
 
   return (
     <div className="lv2">
@@ -196,17 +213,17 @@ export default function Dashboard({ onGoHome }: Props) {
           <h2 className="step-title">Your Registrations</h2>
           <p className="step-desc">
             {isConnected
-              ? <>Items registered by <span className="result-mono">{address}</span> from this browser will appear here.</>
+              ? <>Everything registered on-chain by <span className="result-mono">{address}</span>, sourced live from the registry.</>
               : 'Connect your wallet to view your registered items.'}
           </p>
         </div>
 
-        <div className="sub-tabs" style={{ marginBottom: '20px' }}>
-          <button type="button" className={`sub-tab ${tab === 'wasm' ? 'sub-tab-active' : ''}`} onClick={() => setTab('wasm')}>
+        <div className="sub-tabs sub-tabs-lg" style={{ marginBottom: '20px' }}>
+          <button type="button" className={`sub-tab sub-tab-lg ${tab === 'wasm' ? 'sub-tab-active' : ''}`} onClick={() => setTab('wasm')}>
             WASM
             {wasmRecords.length > 0 && <span className="sub-tab-count">{wasmRecords.length}</span>}
           </button>
-          <button type="button" className={`sub-tab ${tab === 'yaml' ? 'sub-tab-active' : ''}`} onClick={() => setTab('yaml')}>
+          <button type="button" className={`sub-tab sub-tab-lg ${tab === 'yaml' ? 'sub-tab-active' : ''}`} onClick={() => setTab('yaml')}>
             YAML
             {yamlRecords.length > 0 && <span className="sub-tab-count">{yamlRecords.length}</span>}
           </button>
@@ -217,6 +234,18 @@ export default function Dashboard({ onGoHome }: Props) {
             <p className="dashboard-empty-title">Wallet not connected</p>
             <p className="dashboard-empty-desc">Connect your wallet to view your registrations.</p>
           </div>
+        ) : error ? (
+          <div className="dashboard-empty">
+            <p className="dashboard-empty-title">Could not reach the registry node</p>
+            <p className="dashboard-empty-desc">{error.message}</p>
+            <button type="button" className="btn-ghost" onClick={refetch} style={{ marginTop: 12 }}>
+              Retry
+            </button>
+          </div>
+        ) : isLoading && wasmRecords.length === 0 && yamlRecords.length === 0 ? (
+          <div className="dashboard-empty">
+            <p className="dashboard-empty-title"><Spinner /> Loading registrations…</p>
+          </div>
         ) : tab === 'wasm' ? (
           wasmRecords.length === 0 ? (
             <div className="dashboard-empty">
@@ -226,7 +255,7 @@ export default function Dashboard({ onGoHome }: Props) {
           ) : (
             <div className="reg-list">
               {wasmRecords.map(r => (
-                <WasmRow key={r.registrationId} record={r} address={address as `0x${string}`} onDeregistered={() => forceRefresh(n => n + 1)} />
+                <WasmRow key={r.RegistrationID} record={r} onDeregistered={refetch} />
               ))}
             </div>
           )
@@ -237,7 +266,7 @@ export default function Dashboard({ onGoHome }: Props) {
           </div>
         ) : (
           <div className="reg-list">
-            {yamlRecords.map(r => <YamlRow key={r.txHash} record={r} />)}
+            {yamlRecords.map(r => <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} />)}
           </div>
         )}
       </div>
