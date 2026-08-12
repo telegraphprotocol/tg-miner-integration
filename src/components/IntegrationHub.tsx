@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Header from './Header';
 import Spinner from './Spinner';
 import { useLeaderboard } from '../hooks/useLeaderboard';
@@ -38,15 +38,21 @@ function RefreshIcon() {
 }
 
 export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
-  const { entries, byIntent, isLoading, error, refetch } = useLeaderboard(10);
-  const [intentFilter, setIntentFilter] = useState('all');
+  const { byIntent, isLoading, error, refetch } = useLeaderboard(10);
+  const [intentFilter, setIntentFilter] = useState('');
 
   const intentOptions = useMemo(
     () => Object.keys(byIntent).sort(),
     [byIntent],
   );
 
-  const activeRows = intentFilter === 'all' ? entries : (byIntent[intentFilter] ?? []);
+  useEffect(() => {
+    if (!intentFilter && intentOptions.length > 0) {
+      setIntentFilter(intentOptions[0]);
+    }
+  }, [intentFilter, intentOptions]);
+
+  const activeRows = byIntent[intentFilter] ?? [];
 
   return (
     <div className="app">
@@ -221,7 +227,7 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
               <span>Live Leaderboard</span>
               {intentOptions.length > 0 && (
                 <div className="lb-intent-filter">
-                  <label htmlFor="lb-intent" className="lb-intent-label">Filter by intent</label>
+                  <label htmlFor="lb-intent" className="lb-intent-label">Intent</label>
                   <div className="field-select-wrap lb-intent-select">
                     <select
                       id="lb-intent"
@@ -229,7 +235,6 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
                       value={intentFilter}
                       onChange={e => setIntentFilter(e.target.value)}
                     >
-                      <option value="all">Overall</option>
                       {intentOptions.map(id => (
                         <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
                       ))}
@@ -256,38 +261,28 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
                     <col className="lb-colw-miner" />
                     <col className="lb-colw-status" />
                     <col className="lb-colw-num" />
-                    <col className="lb-colw-num" />
-                    <col className="lb-colw-num" />
                   </colgroup>
                   <thead>
                     <tr>
                       <th className="lb-col-rank">Rank</th>
                       <th>Miner</th>
                       <th>Status</th>
-                      <th className="lb-col-num">Avg Score</th>
-                      <th className="lb-col-num">Requests</th>
-                      <th className="lb-col-num">Best Rank</th>
+                      <th className="lb-col-num">Score</th>
                     </tr>
                   </thead>
                   <tbody>
                     {activeRows.map(e => (
                       <tr key={e.miner_slug}>
                         <td className="lb-col-rank">
-                          <span className={`lb-rank ${rankClass(e.position)}`}>{e.position}</span>
+                          <span className={`lb-rank ${rankClass(e.rank ?? 0)}`}>{e.rank ?? '—'}</span>
                         </td>
                         <td className="result-mono lb-col-miner">{e.miner_slug}</td>
                         <td>
-                          {e.activation_status ? (
-                            <span className={`reg-status-badge ${e.activation_status === 'active' ? 'badge-success' : 'wasm-status-pending'}`}>
-                              {e.activation_status.toUpperCase()}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
+                          <span className={`reg-status-badge ${e.activation_status === 'active' ? 'badge-success' : 'wasm-status-pending'}`}>
+                            {e.activation_status.toUpperCase()}
+                          </span>
                         </td>
-                        <td className="lb-col-num">{typeof e.avg_score === 'number' ? e.avg_score.toFixed(3) : '—'}</td>
-                        <td className="lb-col-num">{e.total_requests_served}</td>
-                        <td className="lb-col-num">{e.best_rank != null ? `#${e.best_rank}` : '—'}</td>
+                        <td className="lb-col-num">{typeof e.score === 'number' ? e.score.toFixed(3) : '—'}</td>
                       </tr>
                     ))}
                   </tbody>

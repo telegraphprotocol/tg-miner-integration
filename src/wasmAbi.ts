@@ -137,25 +137,19 @@ export interface AddressBundleResponse {
 
 export interface LeaderboardEntry {
   miner_slug: string;
-  /** Only present on entries from GET /leaderboard/miners — the by-intent breakdown omits it. */
-  activation_status?: 'pending' | 'active' | 'rejected' | 'superseded' | 'deregistered' | string;
-  avg_score: number | null;
-  best_rank: number | null;
-  epochs_participated: number;
-  total_requests_served: number;
-  position: number;
+  score: number | null;
+  rank: number | null;
+  activation_status: 'pending' | 'active' | 'rejected' | 'superseded' | 'deregistered' | string;
 }
 
+/**
+ * GET /leaderboard/miners (optionally ?intent=X, ?limit=N) and
+ * GET /leaderboard/miners/epoch/:n both return this shape — entries grouped by intent for one epoch.
+ * There is no separate "overall" list from the backend; build one client-side if needed.
+ */
 export interface LeaderboardResponse {
-  entries: LeaderboardEntry[];
-  epoch_start: number;
-  epoch_end: number;
-}
-
-export interface LeaderboardByIntentResponse {
+  epoch: number;
   intents: Record<string, LeaderboardEntry[]>;
-  epoch_start: number;
-  epoch_end: number;
 }
 
 export const REVERT_MESSAGES: Record<string, string> = {
