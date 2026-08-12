@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { TELEGRAPH_NODE_URL, type AddressBundleResponse, type MinerRecordApi, type WasmRecordApi } from '../wasmAbi';
+import type { AddressBundleResponse, MinerRecordApi, WasmRecordApi } from '../wasmAbi';
 
 export function useAddressRegistrations(address: string | undefined): {
   miners: MinerRecordApi[];
@@ -24,7 +24,7 @@ export function useAddressRegistrations(address: string | undefined): {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${TELEGRAPH_NODE_URL}/engine/validator/v1/addresses/${address}`);
+      const res = await fetch(`/api/registrations/${address}`);
       if (!res.ok) throw new Error(`Node returned HTTP ${res.status}`);
       const data = (await res.json()) as AddressBundleResponse;
       setMiners(data.miners ?? []);

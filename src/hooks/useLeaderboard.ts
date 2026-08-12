@@ -1,11 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  TELEGRAPH_NODE_URL,
-  type LeaderboardByIntentResponse,
-  type LeaderboardEntry,
-  type LeaderboardResponse,
+import type {
+  LeaderboardByIntentResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
 } from '../wasmAbi';
 
 export function useLeaderboard(limit = 10): {
@@ -29,8 +28,8 @@ export function useLeaderboard(limit = 10): {
     setError(null);
     try {
       const [overallRes, byIntentRes] = await Promise.all([
-        fetch(`${TELEGRAPH_NODE_URL}/leaderboard/miners?limit=${limit}`),
-        fetch(`${TELEGRAPH_NODE_URL}/leaderboard/miners/by-intent?limit=${limit}`),
+        fetch(`/api/leaderboard/miners?limit=${limit}`),
+        fetch(`/api/leaderboard/miners/by-intent?limit=${limit}`),
       ]);
       if (!overallRes.ok) throw new Error(`Node returned HTTP ${overallRes.status}`);
       const overall = (await overallRes.json()) as LeaderboardResponse;
