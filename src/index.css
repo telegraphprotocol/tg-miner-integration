@@ -263,6 +263,12 @@ body::before {
   flex-shrink: 0;
 }
 
+.wallet-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
 .wallet-account-wrap {
   position: relative;
 }
@@ -350,6 +356,16 @@ body::before {
 
 @media (max-width: 380px) {
   .app-logo-text { display: none; }
+}
+
+@media (max-width: 480px) {
+  .app-header-right { gap: 8px; }
+  .wallet-pill-label { max-width: 84px; }
+  .ext-links-dropdown,
+  .wallet-dropdown {
+    right: 0;
+    max-width: calc(100vw - 24px);
+  }
 }
 
 /* ══════════════════════════════════════════════
@@ -2637,28 +2653,49 @@ body::before {
   .lv2-nav-toggle { display: flex; }
 
   .lv2-nav-links {
-    position: absolute;
-    top: calc(100% + 12px);
+    position: fixed;
+    top: 64px;
     right: 0;
+    bottom: 0;
+    left: 0;
     flex-direction: column;
     align-items: stretch;
     gap: 4px;
-    min-width: 220px;
-    padding: 10px;
+    padding: 16px;
     background: #0a0a0e;
-    border: 1px solid rgba(255,255,255,0.14);
-    border-radius: 8px;
+    border-left: 1px solid rgba(255,255,255,0.14);
     box-shadow: 0 16px 48px rgba(0,0,0,0.75), 0 0 0 1px rgba(0,0,0,0.6);
-    opacity: 0;
-    transform: translateY(-6px);
+    transform: translateX(100%);
     pointer-events: none;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    transition: transform 0.25s ease;
     z-index: 100;
+    overflow-y: auto;
+  }
+
+  /* AccountButton / WalletBar sit inside the stacked mobile menu — stretch
+     them full-width and let their own nested dropdowns open below in-flow
+     instead of absolutely anchored, so they can't overflow the viewport. */
+  .lv2-nav-links .account-btn-wrap,
+  .lv2-nav-links .wallet-account-wrap,
+  .lv2-nav-links .wallet-bar {
+    width: 100%;
+  }
+  .lv2-nav-links .wallet-pill {
+    width: 100%;
+    justify-content: center;
+  }
+  .lv2-nav-links .account-dropdown,
+  .lv2-nav-links .wallet-dropdown,
+  .lv2-nav-links .auth-dropdown-panel {
+    position: static;
+    width: 100%;
+    max-width: none;
+    margin-top: 4px;
+    box-shadow: none;
   }
 
   .lv2-nav-links-open {
-    opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
     pointer-events: auto;
   }
 
@@ -3551,7 +3588,10 @@ body::before {
 
 @media (max-width: 480px) {
   .auth-dropdown-panel {
-    right: -16px;
+    right: 0;
+    left: 12px;
+    width: auto;
+    max-width: none;
   }
 }
 
@@ -3706,6 +3746,10 @@ body::before {
 }
 
 @media (max-width: 640px) {
+  /* iOS Safari auto-zooms on focus when an input's font-size is under 16px */
+  .field-input,
+  .field-select,
+  .field-textarea { font-size: 16px; }
   .modal-bd { padding: 12px; }
   .modal-import {
     padding: 18px;
@@ -3714,6 +3758,12 @@ body::before {
     overflow-y: auto;
   }
   .modal-header-left { font-size: 11px; }
+  .modal-auth {
+    padding: 18px;
+    gap: 14px;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
   .import-mode-grid {
     grid-template-columns: 1fr;
     gap: 8px;
@@ -3775,6 +3825,28 @@ body::before {
   .register-grid { grid-template-columns: 1fr; }
   .register-card-full { grid-column: auto; }
   .step-nav { display: none; }
+  .wizard-form-panel { padding: 24px 20px; }
+}
+
+@media (max-width: 560px) {
+  .field-tooltip-popup {
+    left: auto;
+    right: -8px;
+    min-width: 200px;
+    max-width: calc(100vw - 48px);
+  }
+  .field-row-2,
+  .field-row-3 { grid-template-columns: 1fr; }
+  .req-field-header { display: none; }
+  .req-field-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .req-field-opts { justify-content: space-between; }
 }
 
 /* ══════════════════════════════════════════════
