@@ -20,20 +20,23 @@ import { useToast } from './Toast';
 import WalletBar from './WalletBar';
 import Spinner from './Spinner';
 import IntentSearchList from './IntentSearchList';
+import AuthModal from './AuthModal';
+import { useSession } from '../hooks/useSession';
 
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
 
 interface Props {
-  onBack: () => void;
   onDone: () => void;
 }
 
 type Phase = 'select' | 'hashed' | 'uploaded' | 'verified';
 
-export default function WasmWizard({ onBack, onDone }: Props) {
+export default function WasmWizard({ onDone }: Props) {
   const toast = useToast();
   const { address, isConnected, chain } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
+  const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
+  const [showAuth, setShowAuth] = useState(false);
 
   const [file, setFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<Phase>('select');
@@ -47,6 +50,8 @@ export default function WasmWizard({ onBack, onDone }: Props) {
   const [result, setResult] = useState<{ registrationId: string; intentId: string } | null>(null);
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
+  const walletMismatch = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() !== address.toLowerCase();
+  const noLinkedWallet = !!user && !user.walletAddress;
   const { intents: canonicalIntents, isLoading: intentsLoading, error: intentsError } = useCanonicalIntents();
 
   const {
@@ -151,6 +156,7 @@ export default function WasmWizard({ onBack, onDone }: Props) {
   };
 
   const handleRegister = () => {
+    if (!user?.walletAddress || walletMismatch) return;
     resetRegister();
     writeRegister({
       address: DIAMOND_ADDRESS,
@@ -341,7 +347,7 @@ export default function WasmWizard({ onBack, onDone }: Props) {
               {!isConnected ? (
                 <div className="wallet-disconnected">
                   <p className="wallet-disconnected-text">Connect your wallet to proceed.</p>
-                  <WalletBar onOpenDashboard={onDone} />
+                  <WalletBar />
                 </div>
               ) : wrongNetwork ? (
                 <div className="wallet-disconnected">
@@ -360,15 +366,40 @@ export default function WasmWizard({ onBack, onDone }: Props) {
                     <span className="result-row-label">ADDRESS</span>
                     <span className="result-row-value result-mono">{address}</span>
                   </div>
+                  {!sessionLoading && !user && (
+                    <div className="wallet-disconnected" style={{ marginTop: 12 }}>
+                      <p className="wallet-disconnected-text">Sign in to register a WASM module.</p>
+                      <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setShowAuth(true)}>
+                        Login
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
+
+            {showAuth && (
+              <AuthModal
+                defaultTab="login"
+                onClose={() => setShowAuth(false)}
+                onAuthed={() => { setShowAuth(false); refetchSession(); }}
+              />
+            )}
 
             <div className="register-card register-card-full">
               <div className="register-card-header"><span>Transaction</span></div>
 
               {!isConnected || wrongNetwork ? (
                 <p className="field-hint">Connect your wallet and switch to Base Sepolia to continue.</p>
+              ) : !user ? (
+                <p className="field-hint">Sign in above to continue.</p>
+              ) : noLinkedWallet ? (
+                <p className="field-error">No wallet linked to your account yet. Link one from your Profile before registering.</p>
+              ) : walletMismatch ? (
+                <p className="field-error">
+                  Connected wallet doesn't match your account's linked wallet
+                  (<span className="result-mono">{user.walletAddress}</span>). Switch wallets to continue.
+                </p>
               ) : selectedIntents.length === 0 ? (
                 <p className="field-hint">Select at least one intent this module serves above to continue.</p>
               ) : isRegisterInFlight ? (
@@ -390,10 +421,6 @@ export default function WasmWizard({ onBack, onDone }: Props) {
           </div>
         </>
       )}
-
-      <div className="step-footer">
-        <button className="btn-ghost" onClick={onBack}>← Back</button>
-      </div>
     </div>
   );
 }

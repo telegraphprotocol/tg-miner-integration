@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
-import WalletBar from './WalletBar';
+import Header from './Header';
 import Spinner from './Spinner';
 import { useToast } from './Toast';
 import { useAddressRegistrations } from '../hooks/useAddressRegistrations';
@@ -18,6 +18,7 @@ import {
 
 interface Props {
   onGoHome: () => void;
+  onOpenProfile: () => void;
 }
 
 type Tab = 'wasm' | 'yaml';
@@ -175,7 +176,7 @@ function MinerRow({ record, onDeregistered }: {
   );
 }
 
-export default function Dashboard({ onGoHome }: Props) {
+export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
   const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>('wasm');
   const { miners, wasm, isLoading, error, refetch } = useAddressRegistrations(address);
@@ -190,27 +191,15 @@ export default function Dashboard({ onGoHome }: Props) {
   const yamlRecords = miners;
 
   return (
-    <div className="lv2">
-      <nav className="lv2-nav">
-        <button type="button" className="lv2-nav-logo lv2-nav-logo-btn" onClick={onGoHome}>
-          <img src="/logo.png" alt="Telegraph" className="lv2-logo-img" />
-          <span className="lv2-logo-text">TELEGRAPH</span>
-        </button>
-        <div className="lv2-nav-links">
-          <WalletBar onOpenDashboard={onGoHome} />
-        </div>
-      </nav>
+    <div className="app">
+      <Header onGoHome={onGoHome} onOpenDashboard={() => {}} onOpenProfile={onOpenProfile} onBack={onGoHome} />
 
-      <div className="dashboard-body">
-        <button type="button" className="lv2-back-btn" onClick={onGoHome}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <polyline points="15 18 9 12 15 6"/>
-          </svg>
-          Back to Home
-        </button>
+      <div className="app-body">
+        <div className="dashboard-body">
 
-        <div className="dashboard-heading">
-          <h2 className="step-title">Your Registrations</h2>
+        <div className="step-section-heading">
+          <div className="step-eyebrow">YOUR REGISTRATIONS</div>
+          <h2 className="step-title">Registrations</h2>
           <p className="step-desc">
             {isConnected
               ? <>Everything registered on-chain by <span className="result-mono">{address}</span>, sourced live from the registry.</>
@@ -238,8 +227,8 @@ export default function Dashboard({ onGoHome }: Props) {
           <div className="dashboard-empty">
             <p className="dashboard-empty-title">Could not reach the registry node</p>
             <p className="dashboard-empty-desc">{error.message}</p>
-            <button type="button" className="btn-ghost" onClick={refetch} style={{ marginTop: 12 }}>
-              Retry
+            <button type="button" className="btn-ghost" onClick={refetch} disabled={isLoading} style={{ marginTop: 12 }}>
+              {isLoading ? <><Spinner /> Retrying…</> : 'Retry'}
             </button>
           </div>
         ) : isLoading && wasmRecords.length === 0 && yamlRecords.length === 0 ? (
@@ -269,6 +258,7 @@ export default function Dashboard({ onGoHome }: Props) {
             {yamlRecords.map(r => <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} />)}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

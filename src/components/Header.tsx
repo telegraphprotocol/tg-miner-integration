@@ -1,12 +1,16 @@
 'use client';
 
 import WalletBar from './WalletBar';
+import ExternalLinksNav from './ExternalLinksNav';
+import AccountButton from './AccountButton';
 import type { Step } from '../types';
 
 interface Props {
   step?: Step;
   onGoHome: () => void;
   onOpenDashboard: () => void;
+  onOpenProfile: () => void;
+  onBack?: () => void;
 }
 
 const STEPS = [
@@ -15,13 +19,23 @@ const STEPS = [
   { n: 3, label: 'Register On-Chain' },
 ];
 
-export default function Header({ step, onGoHome, onOpenDashboard }: Props) {
+export default function Header({ step, onGoHome, onOpenDashboard, onOpenProfile, onBack }: Props) {
   return (
     <header className="app-header">
-      <button type="button" className="app-header-logo app-header-logo-btn" onClick={onGoHome}>
-        <img src="/logo.png" alt="Telegraph" className="app-logo-img" />
-        <span className="app-logo-text">TELEGRAPH</span>
-      </button>
+      <div className="app-header-left">
+        <button type="button" className="app-header-logo app-header-logo-btn" onClick={onGoHome}>
+          <img src="/logo.png" alt="Telegraph" className="app-logo-img" />
+          <span className="app-logo-text">TELEGRAPH</span>
+        </button>
+        {onBack && (
+          <button type="button" className="lv2-nav-back-btn" onClick={onBack}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back
+          </button>
+        )}
+      </div>
 
       {step !== undefined && (
         <nav className="step-nav">
@@ -42,7 +56,9 @@ export default function Header({ step, onGoHome, onOpenDashboard }: Props) {
       )}
 
       <div className="app-header-right">
-        <WalletBar onOpenDashboard={onOpenDashboard} />
+        <ExternalLinksNav mode="dropdown" />
+        <AccountButton onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} />
+        <WalletBar />
       </div>
     </header>
   );

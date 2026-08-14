@@ -3,12 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useDisconnect } from 'wagmi';
+import { emitIntentSignal } from '../hooks/useIntentSignal';
 
-interface Props {
-  onOpenDashboard: () => void;
-}
-
-export default function WalletBar({ onOpenDashboard }: Props) {
+export default function WalletBar() {
   const { disconnect } = useDisconnect();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -33,30 +30,18 @@ export default function WalletBar({ onOpenDashboard }: Props) {
             className="wallet-bar"
             {...(!ready && { 'aria-hidden': true, style: { opacity: 0, pointerEvents: 'none', userSelect: 'none' } })}
           >
-            {connected && (
-              <button type="button" className="wallet-pill" onClick={onOpenDashboard}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <rect x="3" y="3" width="7" height="9" rx="1" />
-                  <rect x="14" y="3" width="7" height="5" rx="1" />
-                  <rect x="14" y="12" width="7" height="9" rx="1" />
-                  <rect x="3" y="16" width="7" height="5" rx="1" />
-                </svg>
-                Dashboard
-              </button>
-            )}
-
             {!connected ? (
-              <button type="button" className="wallet-pill wallet-pill-primary" onClick={openConnectModal}>
+              <button type="button" className="wallet-pill wallet-pill-primary" onClick={() => { emitIntentSignal(); openConnectModal(); }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <rect x="2" y="7" width="20" height="14" rx="2" />
                   <path d="M16 3H8a2 2 0 0 0-2 2v2h12V5a2 2 0 0 0-2-2z" />
                   <circle cx="17" cy="14" r="1.5" fill="currentColor" />
                 </svg>
-                Connect Wallet
+                Connect
               </button>
             ) : chain.unsupported ? (
               <button type="button" className="wallet-pill wallet-pill-danger" onClick={openChainModal}>
-                Wrong Network
+                Wrong Chain
               </button>
             ) : (
               <div className="wallet-account-wrap" ref={wrapRef}>

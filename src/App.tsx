@@ -9,14 +9,16 @@ import PinataUpload from './components/PinataUpload';
 import ContractRegister from './components/ContractRegister';
 import ImportModal from './components/ImportModal';
 import Dashboard from './components/Dashboard';
+import ProfilePage from './components/ProfilePage';
 import WasmWizard from './components/WasmWizard';
 import IntegrationHub from './components/IntegrationHub';
+import SignupNudge from './components/SignupNudge';
 import { ToastProvider, useToast } from './components/Toast';
 import { DEFAULT_FORM } from './formState';
 import type { Step, FormState, PinataResult } from './types';
 import { generateYaml } from './yamlGen';
 
-type View = 'landing' | 'app' | 'dashboard' | 'wasm' | 'integrate';
+type View = 'landing' | 'app' | 'dashboard' | 'profile' | 'wasm' | 'integrate';
 
 function AppInner() {
   const toast = useToast();
@@ -72,6 +74,7 @@ function AppInner() {
           onImportToUpload={handleImportToUpload}
           onRegisterDirect={handleRegisterDirect}
           onOpenDashboard={() => setView('dashboard')}
+          onOpenProfile={() => setView('profile')}
           onRegisterWasm={() => setView('wasm')}
           onOpenIntegrate={() => setView('integrate')}
         />
@@ -87,6 +90,7 @@ function AppInner() {
         <IntegrationHub
           onGoHome={() => setView('landing')}
           onOpenDashboard={() => setView('dashboard')}
+          onOpenProfile={() => setView('profile')}
         />
       </>
     );
@@ -96,7 +100,16 @@ function AppInner() {
     return (
       <>
         <AppBackground />
-        <Dashboard onGoHome={() => setView('landing')} />
+        <Dashboard onGoHome={() => setView('landing')} onOpenProfile={() => setView('profile')} />
+      </>
+    );
+  }
+
+  if (view === 'profile') {
+    return (
+      <>
+        <AppBackground />
+        <ProfilePage onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} />
       </>
     );
   }
@@ -105,9 +118,9 @@ function AppInner() {
     return (
       <div className="app">
         <AppBackground />
-        <Header onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} />
+        <Header onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} onOpenProfile={() => setView('profile')} onBack={() => setView('landing')} />
         <div className="app-body">
-          <WasmWizard onBack={() => setView('landing')} onDone={() => setView('dashboard')} />
+          <WasmWizard onDone={() => setView('dashboard')} />
         </div>
       </div>
     );
@@ -116,7 +129,7 @@ function AppInner() {
   return (
     <div className="app">
       <AppBackground />
-      <Header step={step} onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} />
+      <Header step={step} onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} onOpenProfile={() => setView('profile')} />
 
       <div className="app-body">
         {step === 1 && (
@@ -152,6 +165,7 @@ export default function App() {
   return (
     <ToastProvider>
       <AppInner />
+      <SignupNudge />
     </ToastProvider>
   );
 }

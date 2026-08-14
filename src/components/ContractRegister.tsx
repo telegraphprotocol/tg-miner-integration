@@ -6,8 +6,10 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
 import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
+import AuthModal from './AuthModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
+import { useSession } from '../hooks/useSession';
 
 const REGISTRY_ABI = [
   {
@@ -59,6 +61,8 @@ interface Props {
 export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack }: Props) {
   const toast = useToast();
   const { address, isConnected, chain } = useAccount();
+  const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
+  const [showAuth, setShowAuth] = useState(false);
 
   const [mode, setMode] = useState<Mode>(pinataResult ? 'auto' : 'manual');
   const [feeAddress, setFeeAddress]   = useState('');
@@ -108,7 +112,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const isSuccess    = isConfirmed;
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
-  const canSubmit    = isConnected && !wrongNetwork && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+  const walletMismatch = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() !== address.toLowerCase();
+  const noLinkedWallet = !!user && !user.walletAddress;
+  const canSubmit    = isConnected && !wrongNetwork && !!user && !!user.walletAddress && !walletMismatch && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
@@ -231,7 +237,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               <ConnectButton.Custom>
                 {({ openConnectModal }) => (
                   <button type="button" className="wallet-pill wallet-pill-primary" onClick={openConnectModal}>
-                    Connect Wallet
+                    Connect
                   </button>
                 )}
               </ConnectButton.Custom>
@@ -242,7 +248,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               <ConnectButton.Custom>
                 {({ openChainModal }) => (
                   <button type="button" className="wallet-pill wallet-pill-danger" onClick={openChainModal}>
-                    Wrong Network
+                    Wrong Chain
                   </button>
                 )}
               </ConnectButton.Custom>
@@ -261,9 +267,36 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 <span className="result-row-label">CONTRACT</span>
                 <span className="result-row-value result-mono result-truncate">{CONTRACT_ADDRESS || '—'}</span>
               </div>
+              {!sessionLoading && !user && (
+                <div className="wallet-disconnected" style={{ marginTop: 12 }}>
+                  <p className="wallet-disconnected-text">Sign in to register a miner.</p>
+                  <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setShowAuth(true)}>
+                    Login
+                  </button>
+                </div>
+              )}
+              {!sessionLoading && noLinkedWallet && (
+                <p className="field-error" style={{ marginTop: 12 }}>
+                  No wallet linked to your account yet. Link one from your Profile before registering.
+                </p>
+              )}
+              {!sessionLoading && walletMismatch && (
+                <p className="field-error" style={{ marginTop: 12 }}>
+                  Connected wallet doesn't match your account's linked wallet
+                  (<span className="result-mono">{user!.walletAddress}</span>). Switch wallets to continue.
+                </p>
+              )}
             </div>
           )}
         </div>
+
+        {showAuth && (
+          <AuthModal
+            defaultTab="login"
+            onClose={() => setShowAuth(false)}
+            onAuthed={() => { setShowAuth(false); refetchSession(); }}
+          />
+        )}
 
         {/* Hash source */}
         <div className="register-card">
@@ -417,6 +450,8 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               {isConnected && !wrongNetwork && (
                 <div className="reg-checklist">
                   {[
+                    { label: 'Signed in',             ok: !!user },
+                    { label: 'Wallet linked to account', ok: !!user?.walletAddress && !walletMismatch },
                     { label: 'YAML URL set',         ok: !!effectiveUrl },
                     { label: 'Hash valid (bytes32)',  ok: !!effectiveHash && effectiveHash.length === 66 },
                     { label: 'Fee address set',       ok: !!feeAddress && feeAddress !== '0x0000000000000000000000000000000000000000' },
@@ -449,8 +484,11 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                {!isConnected       ? 'Connect Wallet First'
+                {!isConnected       ? 'Connect First'
                   : wrongNetwork    ? 'Switch to Base Sepolia'
+                  : !user           ? 'Sign In First'
+                  : noLinkedWallet  ? 'Link a Wallet First'
+                  : walletMismatch  ? 'Wrong Wallet Connected'
                   : !CONTRACT_ADDRESS ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
                   : txError         ? 'Retry Registration'

@@ -2,13 +2,18 @@
 
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
+import { emitIntentSignal } from '../hooks/useIntentSignal';
 import WalletBar from './WalletBar';
+import LiveLeaderboard from './LiveLeaderboard';
+import ExternalLinksNav from './ExternalLinksNav';
+import AccountButton from './AccountButton';
 
 interface Props {
   onCreate: () => void;
   onImportToUpload: () => void;
   onRegisterDirect: () => void;
   onOpenDashboard: () => void;
+  onOpenProfile: () => void;
   onRegisterWasm: () => void;
   onOpenIntegrate: () => void;
 }
@@ -33,43 +38,43 @@ const CARDS = [
   {
     key: 'register',
     step: '03',
-    title: 'Register On-Chain',
+    title: 'Register',
     desc: 'Already have an IPFS hash? Submit directly to the registry contract on Base Sepolia.',
     cta: 'Register now →',
-    tags: ['Base Sepolia', 'On-chain'],
+    tags: ['Base Sepolia', 'Registry'],
   },
 ] as const;
 
 const ROOT_CARDS = [
   {
     key: 'yaml',
-    title: 'Register YAML for Miner',
-    desc: 'Describe an inference node with a YAML config, pin it to IPFS, and register it on-chain.',
+    title: 'Connect API',
+    desc: 'Hook your API in 2 minutes. Get ranked, race to the top of the leaderboard, and compete to win paid requests directly from machines & agents.',
     cta: 'Continue →',
     tags: ['Miner', 'Available now'],
-    gated: true,
+    gated: false,
   },
   {
     key: 'wasm',
-    title: 'Register WASM',
-    desc: 'Publish a candidate scoring module and register it on-chain against a bond.',
+    title: 'Submit WASM',
+    desc: 'Write evaluation scripts. Build the logic that ranks APIs, and earn recurring revenue every time your script runs.',
     cta: 'Continue →',
     tags: ['WASM', 'Available now'],
-    gated: true,
+    gated: false,
   },
   {
     key: 'integrate',
-    title: 'Integrate & Compete',
-    desc: 'Point your API at the benchmark, get ranked on the leaderboard, and see how to consume Telegraph from your own agents.',
+    title: 'Consume Intelligence',
+    desc: 'Power your agents with ranked intelligence. Drop in our 1-line SDK to automatically route requests to the top ranked providers.',
     cta: 'Explore →',
-    tags: ['Leaderboard', 'MCP · WebSocket'],
+    tags: ['MCP · WebSocket', 'SDK'],
     gated: false,
   },
 ] as const;
 
 type Choice = 'root' | 'yaml';
 
-export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onRegisterWasm, onOpenIntegrate }: Props) {
+export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onOpenProfile, onRegisterWasm, onOpenIntegrate }: Props) {
   const { isConnected } = useAccount();
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -92,9 +97,19 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
 
       {/* ── Navbar ── */}
       <nav className="lv2-nav">
-        <div className="lv2-nav-logo">
-          <img src="/logo.png" alt="Telegraph" className="lv2-logo-img" />
-          <span className="lv2-logo-text">TELEGRAPH</span>
+        <div className="lv2-nav-left">
+          <div className="lv2-nav-logo">
+            <img src="/logo.png" alt="Telegraph" className="lv2-logo-img" />
+            <span className="lv2-logo-text">TELEGRAPH</span>
+          </div>
+          {choice === 'yaml' && (
+            <button type="button" className="lv2-nav-back-btn" onClick={() => setChoice('root')}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              Back
+            </button>
+          )}
         </div>
 
         <button
@@ -110,33 +125,9 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
         </button>
 
         <div className={`lv2-nav-links ${menuOpen ? 'lv2-nav-links-open' : ''}`}>
-          <a
-            href="https://telegraphprotocol.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lv2-nav-link"
-            onClick={() => setMenuOpen(false)}
-          >
-            Telegraph Protocol
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-          </a>
-          <a
-            href="https://docs.telegraphprotocol.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lv2-nav-link"
-            onClick={() => setMenuOpen(false)}
-          >
-            Docs
-            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-              <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-            </svg>
-          </a>
-          <WalletBar onOpenDashboard={onOpenDashboard} />
+          <ExternalLinksNav mode="inline" onNavigate={() => setMenuOpen(false)} />
+          <AccountButton onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} />
+          <WalletBar />
         </div>
       </nav>
 
@@ -144,65 +135,59 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
       <div className="lv2-hero">
         <div className="lv2-tagline">
           <span className="lv2-tagline-pip" />
-          Be part of the Telegraph Protocol
+          See how your API gets scored
           <span className="lv2-tagline-pip" />
         </div>
 
         {choice === 'root' && (
           <>
-            {!isConnected && (
-              <p className="lv2-connect-hint">Connect your wallet above to start registering.</p>
-            )}
-            <div className="lv2-cards lv2-cards-root">
-              {ROOT_CARDS.map(card => {
-                const locked = card.gated && !isConnected;
-                return (
-                <button
-                  key={card.key}
-                  type="button"
-                  className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${locked ? ' lv2-card-disabled' : ''}`}
-                  disabled={locked}
-                  onClick={rootHandlers[card.key]}
-                  onMouseEnter={() => setHovered(card.key)}
-                  onMouseLeave={() => setHovered(null)}
-                >
-                  <div className="lv2-card-glow" />
-                  <div className="lv2-card-corner lv2-corner-tl" />
-                  <div className="lv2-card-corner lv2-corner-br" />
+            <div className="lv2-cards-block" id="root-cards">
+              <div className="lv2-cards lv2-cards-root">
+                {ROOT_CARDS.map(card => {
+                  const locked = card.gated && !isConnected;
+                  return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${locked ? ' lv2-card-disabled' : ''}`}
+                    disabled={locked}
+                    onClick={() => { emitIntentSignal(); rootHandlers[card.key](); }}
+                    onMouseEnter={() => setHovered(card.key)}
+                    onMouseLeave={() => setHovered(null)}
+                  >
+                    <div className="lv2-card-glow" />
+                    <div className="lv2-card-corner lv2-corner-tl" />
+                    <div className="lv2-card-corner lv2-corner-br" />
 
-                  <div className="lv2-card-body">
-                    <span className="lv2-card-title">{card.title}</span>
-                    <p className="lv2-card-desc">{card.desc}</p>
-                    <div className="lv2-card-tags">
-                      {card.tags.map(t => <span key={t} className="lv2-card-tag">{t}</span>)}
+                    <div className="lv2-card-body">
+                      <span className="lv2-card-title">{card.title}</span>
+                      <p className="lv2-card-desc">{card.desc}</p>
+                      <div className="lv2-card-tags">
+                        {card.tags.map(t => <span key={t} className="lv2-card-tag">{t}</span>)}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="lv2-card-cta">
-                    {card.cta}
-                    {!locked && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <line x1="5" y1="12" x2="19" y2="12"/>
-                        <polyline points="12 5 19 12 12 19"/>
-                      </svg>
-                    )}
-                  </div>
-                </button>
-                );
-              })}
+                    <div className="lv2-card-cta">
+                      {card.cta}
+                      {!locked && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <line x1="5" y1="12" x2="19" y2="12"/>
+                          <polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <LiveLeaderboard limit={6} className="lv2-leaderboard" />
           </>
         )}
 
         {choice === 'yaml' && (
           <>
-            <button type="button" className="lv2-back-btn" onClick={() => setChoice('root')}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-              Back
-            </button>
-
             <div className="lv2-cards">
               {CARDS.map((card, i) => (
                 <div key={card.key} className="lv2-cards-row-item">

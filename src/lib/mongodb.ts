@@ -1,0 +1,74 @@
+import { MongoClient, Db, ObjectId } from 'mongodb';
+
+const dbName = process.env.MONGODB_DB ?? 'telegraph_register_miner';
+
+let client: MongoClient | undefined;
+let clientPromise: Promise<MongoClient> | undefined;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
+}
+
+function getClientPromise(): Promise<MongoClient> {
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is not configured on the server.');
+
+  // In dev, stash the promise on globalThis so Next.js hot-reload doesn't open
+  // a fresh connection on every edit.
+  if (process.env.NODE_ENV === 'development') {
+    if (!global._mongoClientPromise) {
+      client = new MongoClient(uri);
+      global._mongoClientPromise = client.connect();
+    }
+    return global._mongoClientPromise;
+  }
+
+  if (!clientPromise) {
+    client = new MongoClient(uri);
+    clientPromise = client.connect();
+  }
+  return clientPromise;
+}
+
+export async function getDb(): Promise<Db> {
+  const c = await getClientPromise();
+  return c.db(dbName);
+}
+
+export interface UserDoc {
+  _id?: ObjectId;
+  email: string;
+  passwordHash: string;
+  walletAddress: string | null;
+  walletNonce: string | null;
+  walletNonceIssuedAt: string | null;
+  walletNonceExpiresAt: Date | null;
+  /** Last time a wallet was unlinked from this account — gates the 14-day re-delink cooldown. */
+  walletUnlinkedAt: Date | null;
+  firstName: string | null;
+  lastName: string | null;
+  discordUsername: string | null;
+  xUsername: string | null;
+  /** Once true, firstName/lastName/discordUsername/xUsername are permanent — set after the first save. */
+  profileLocked: boolean;
+  createdAt: Date;
+}
+
+let indexesEnsured = false;
+
+export async function getUsersCollection() {
+  const db = await getDb();
+  const col = db.collection<UserDoc>('users');
+  if (!indexesEnsured) {
+    indexesEnsured = true;
+    await Promise.all([
+      col.createIndex({ email: 1 }, { unique: true }),
+      col.createIndex({ walletAddress: 1 }, { unique: true, sparse: true }),
+    ]).catch(err => {
+      indexesEnsured = false;
+      throw err;
+    });
+  }
+  return col;
+}

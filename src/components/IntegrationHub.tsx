@@ -1,22 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
 import Header from './Header';
-import Spinner from './Spinner';
-import { useLeaderboard } from '../hooks/useLeaderboard';
 import { TELEGRAPH_NODE_URL } from '../wasmAbi';
 import { USE_CASES } from '../useCases';
 
 interface Props {
   onGoHome: () => void;
   onOpenDashboard: () => void;
-}
-
-function rankClass(position: number): string {
-  if (position === 1) return 'lb-rank-1';
-  if (position === 2) return 'lb-rank-2';
-  if (position === 3) return 'lb-rank-3';
-  return '';
+  onOpenProfile: () => void;
 }
 
 function ExternalLinkIcon() {
@@ -28,43 +19,19 @@ function ExternalLinkIcon() {
   );
 }
 
-function RefreshIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="23 4 23 10 17 10" />
-      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-    </svg>
-  );
-}
-
-export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
-  const { byIntent, isLoading, error, refetch } = useLeaderboard(10);
-  const [intentFilter, setIntentFilter] = useState('');
-
-  const intentOptions = useMemo(
-    () => Object.keys(byIntent).sort(),
-    [byIntent],
-  );
-
-  useEffect(() => {
-    if (!intentFilter && intentOptions.length > 0) {
-      setIntentFilter(intentOptions[0]);
-    }
-  }, [intentFilter, intentOptions]);
-
-  const activeRows = byIntent[intentFilter] ?? [];
-
+export default function IntegrationHub({ onGoHome, onOpenDashboard, onOpenProfile }: Props) {
   return (
     <div className="app">
-      <Header onGoHome={onGoHome} onOpenDashboard={onOpenDashboard} />
+      <Header onGoHome={onGoHome} onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} onBack={onGoHome} />
       <div className="app-body">
         <div className="register-layout">
           <div className="step-section-heading">
-            <div className="step-eyebrow">INTEGRATION HUB</div>
-            <h2 className="step-title">Integrate In, or Integrate Out</h2>
+            <div className="step-eyebrow">CONSUME INTELLIGENCE</div>
+            <h2 className="step-title">Integrate Out</h2>
             <p className="step-desc">
-              Point your API at the benchmark and get ranked, or consume Telegraph's network of miners
-              from your own agents and apps. This is the front door to both directions.
+              Call Telegraph's network of miners from your own agents and apps — REST, WebSocket, MCP,
+              or fork a working example below. Looking for the live leaderboard instead? It's on{' '}
+              <button type="button" className="inline-link-btn" onClick={onGoHome}>the homepage</button>.
             </p>
           </div>
 
@@ -110,7 +77,8 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
                   <code className="inline-code">{'{ method, endpoint, payload }'}</code> — the upstream
                   HTTP verb, the miner's path (e.g. <code className="inline-code">/forecast</code>), and
                   the payload forwarded as the body or query params. Find IDs via{' '}
-                  <code className="inline-code">GET /engine/v1/miners</code> or the leaderboard below.
+                  <code className="inline-code">GET /engine/v1/miners</code> or the leaderboard on
+                  the homepage.
                 </p>
                 <a
                   className="io-btn"
@@ -219,80 +187,6 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard }: Props) {
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* ── Leaderboard ── */}
-          <div className="register-card register-card-full">
-            <div className="register-card-header">
-              <span>Live Leaderboard</span>
-              {intentOptions.length > 0 && (
-                <div className="lb-intent-filter">
-                  <label htmlFor="lb-intent" className="lb-intent-label">Intent</label>
-                  <div className="field-select-wrap lb-intent-select">
-                    <select
-                      id="lb-intent"
-                      className="field-input field-select"
-                      value={intentFilter}
-                      onChange={e => setIntentFilter(e.target.value)}
-                    >
-                      {intentOptions.map(id => (
-                        <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
-                      ))}
-                    </select>
-                    <svg className="field-select-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
-                  </div>
-                </div>
-              )}
-              <button type="button" className="io-btn lb-refresh" onClick={refetch} disabled={isLoading}>
-                {isLoading ? <Spinner /> : <><RefreshIcon /> Refresh</>}
-              </button>
-            </div>
-            {error ? (
-              <p className="field-error">Could not reach the registry node. {error.message}</p>
-            ) : isLoading && activeRows.length === 0 ? (
-              <p className="field-hint"><Spinner /> Loading leaderboard…</p>
-            ) : activeRows.length === 0 ? (
-              <p className="field-hint">No leaderboard data yet.</p>
-            ) : (
-              <div className="lb-table-wrap">
-                <table className="lb-table">
-                  <colgroup>
-                    <col className="lb-colw-rank" />
-                    <col className="lb-colw-miner" />
-                    <col className="lb-colw-status" />
-                    <col className="lb-colw-num" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th className="lb-col-rank">Rank</th>
-                      <th>Miner</th>
-                      <th>Status</th>
-                      <th className="lb-col-num">Score</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeRows.map(e => (
-                      <tr key={e.miner_slug}>
-                        <td className="lb-col-rank">
-                          <span className={`lb-rank ${rankClass(e.rank ?? 0)}`}>{e.rank ?? '—'}</span>
-                        </td>
-                        <td className="result-mono lb-col-miner">{e.miner_slug}</td>
-                        <td>
-                          <span className={`reg-status-badge ${e.activation_status === 'active' ? 'badge-success' : 'wasm-status-pending'}`}>
-                            {e.activation_status.toUpperCase()}
-                          </span>
-                        </td>
-                        <td className="lb-col-num">{typeof e.score === 'number' ? e.score.toFixed(3) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          <div className="step-footer">
-            <button className="io-btn" onClick={onGoHome}>← Back to Home</button>
           </div>
         </div>
       </div>

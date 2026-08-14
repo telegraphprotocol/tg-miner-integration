@@ -12,7 +12,6 @@ export interface CanonicalIntent {
 const CACHE_KEY = 'telegraph_canonical_intents_v1';
 
 function readCache(): CanonicalIntent[] {
-  if (typeof window === 'undefined') return [];
   try {
     const raw = window.localStorage.getItem(CACHE_KEY);
     return raw ? (JSON.parse(raw) as CanonicalIntent[]) : [];
