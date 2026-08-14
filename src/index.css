@@ -126,9 +126,21 @@ body::before {
   align-items: center;
   justify-content: space-between;
   padding: 0 48px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Blur/tint rendered via a pseudo-element rather than directly on .app-header —
+   backdrop-filter on an element creates its own stacking context, which traps
+   descendant dropdown menus (account/wallet) behind page content that sits
+   outside .app-header, regardless of their own z-index. */
+.app-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(14px) saturate(160%);
-  border-bottom: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
 
 .app-header-left {
@@ -278,9 +290,7 @@ body::before {
   top: calc(100% + 8px);
   right: 0;
   min-width: 220px;
-  background: rgba(10, 10, 10, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: #0d0d0f;
   border: 1px solid var(--border-strong);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   z-index: 300;
@@ -2411,9 +2421,21 @@ body::before {
   top: 0;
   height: 64px;
   padding: 0 48px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Blur/tint rendered via a pseudo-element rather than directly on .lv2-nav —
+   backdrop-filter on an element makes it the containing block for any
+   position:fixed descendant, which would trap the mobile nav-links panel
+   inside the navbar's own height instead of letting it cover the viewport. */
+.lv2-nav::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(14px) saturate(160%);
-  border-bottom: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
 }
 
 .lv2-nav-left {
@@ -2528,6 +2550,9 @@ body::before {
   gap: 10px;
   min-width: 0;
 }
+.reg-row-top .result-row-value {
+  min-width: 0;
+}
 
 .reg-row-meta {
   display: flex;
@@ -2580,6 +2605,26 @@ body::before {
 .reg-danger:disabled {
   color: rgba(255, 100, 100, 0.35);
   border-color: rgba(255, 100, 100, 0.15);
+}
+
+@media (max-width: 640px) {
+  .sub-tabs-lg { overflow-x: auto; }
+  .reg-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px;
+  }
+  .reg-row-top {
+    flex-wrap: wrap;
+  }
+  .result-truncate {
+    max-width: 100%;
+  }
+  .reg-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .lv2-nav-links {
@@ -2692,7 +2737,12 @@ body::before {
     max-width: none;
     margin-top: 4px;
     box-shadow: none;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
   }
+
+  .lv2-nav-back-btn { display: none; }
 
   .lv2-nav-links-open {
     transform: translateX(0);
@@ -4770,9 +4820,7 @@ body::before {
   top: calc(100% + 8px);
   right: 0;
   min-width: 180px;
-  background: rgba(10, 10, 10, 0.92);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: #0d0d0f;
   border: 1px solid var(--border-strong);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   z-index: 300;

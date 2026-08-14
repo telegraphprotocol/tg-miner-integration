@@ -47,7 +47,7 @@ export default function WalletBar() {
               <div className="wallet-account-wrap" ref={wrapRef}>
                 <button type="button" className="wallet-pill wallet-pill-primary" onClick={() => setOpen(v => !v)}>
                   <span className="wallet-pill-dot" />
-                  {account.displayName}
+                  <span className="wallet-pill-label">{account.displayName}</span>
                 </button>
 
                 {open && (
