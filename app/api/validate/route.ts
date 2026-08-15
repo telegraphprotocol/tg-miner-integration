@@ -11,10 +11,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { yaml, api_key } = (await req.json()) as { yaml: string; api_key: string };
+  const { yaml, api_key } = (await req.json()) as { yaml: string; api_key?: string };
 
-  if (!yaml || !api_key) {
-    return NextResponse.json({ error: 'yaml and api_key are required' }, { status: 400 });
+  if (!yaml) {
+    return NextResponse.json({ error: 'yaml is required' }, { status: 400 });
   }
 
   const upstream = await fetch(`${validatorUrl}/miner-dispatcher/validate`, {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       'Content-Type': 'application/json',
       'X-Internal-Secret': internalSecret,
     },
-    body: JSON.stringify({ yaml, api_key }),
+    body: JSON.stringify({ yaml, api_key: api_key ?? '' }),
   });
 
   const data = await upstream.json();

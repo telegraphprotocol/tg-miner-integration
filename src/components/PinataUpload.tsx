@@ -37,6 +37,7 @@ type UploadState = 'idle' | 'validating' | 'uploading' | 'done' | 'error';
 export default function PinataUpload({ yaml, name, result, onResult, onBack, onNext }: Props) {
   const toast = useToast();
   const [state, setState] = useState<UploadState>(result ? 'done' : 'idle');
+  const [requiresApiKey, setRequiresApiKey] = useState(true);
   const [apiKey, setApiKey] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -44,7 +45,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
   const [apiKeyStored, setApiKeyStored] = useState(false);
 
   const handleUpload = async () => {
-    if (!apiKey.trim()) {
+    if (requiresApiKey && !apiKey.trim()) {
       setErrorMsg('API key is required.');
       setState('error');
       return;
@@ -60,7 +61,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
       const vRes = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml, api_key: apiKey.trim() }),
+        body: JSON.stringify({ yaml, api_key: requiresApiKey ? apiKey.trim() : '' }),
       });
       if (!vRes.ok && vRes.status !== 200) {
         const vErr = await vRes.json().catch(() => ({}));
@@ -121,9 +122,9 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
           <div className="step-eyebrow">STEP 2 OF 3</div>
           <h2 className="step-title">Validate &amp; Upload to IPFS</h2>
           <p className="step-desc">
-            Your API key is sandbox-tested against every endpoint before pinning.
-            On success, it is stored in the node database so your miner goes live
-            automatically after on-chain registration.
+            {requiresApiKey
+              ? 'Your API key is sandbox-tested against every endpoint before pinning. On success, it is stored in the node database so your miner goes live automatically after on-chain registration.'
+              : 'Your endpoints are sandbox-tested before pinning — no API key needed for keyless miners.'}
           </p>
         </div>
 
@@ -147,21 +148,42 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
 
           {state !== 'done' && (
             <div className="field-group" style={{ marginBottom: '20px' }}>
-              <label className="field-label">
-                API Key <span className="field-required">*</span>
-              </label>
-              <input
-                className="field-input"
-                type="password"
-                placeholder="Paste your upstream API key"
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                disabled={busy}
-                autoComplete="off"
-              />
-              <p className="field-hint" style={{ marginTop: '4px', fontSize: '11px', opacity: 0.55 }}>
-                Tested against your endpoints, then stored in the node DB. Never logged.
-              </p>
+              <div className="toggle-row">
+                <div>
+                  <div className="field-label">Requires API Key</div>
+                  <p className="field-hint" style={{ marginTop: 2 }}>
+                    Turn off for keyless miners — public APIs that don't need an upstream key.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={`toggle ${requiresApiKey ? 'toggle-on' : ''}`}
+                  onClick={() => setRequiresApiKey(v => !v)}
+                  disabled={busy}
+                >
+                  <div className="toggle-thumb" />
+                </button>
+              </div>
+
+              {requiresApiKey && (
+                <>
+                  <label className="field-label" style={{ marginTop: '14px' }}>
+                    API Key <span className="field-required">*</span>
+                  </label>
+                  <input
+                    className="field-input"
+                    type="password"
+                    placeholder="Paste your upstream API key"
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    disabled={busy}
+                    autoComplete="off"
+                  />
+                  <p className="field-hint" style={{ marginTop: '4px', fontSize: '11px', opacity: 0.55 }}>
+                    Tested against your endpoints, then stored in the node DB. Never logged.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -215,7 +237,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
             <button
               className={`btn-fill btn-full ${busy ? 'btn-loading' : ''}`}
               onClick={handleUpload}
-              disabled={busy || !apiKey.trim()}
+              disabled={busy || (requiresApiKey && !apiKey.trim())}
             >
               {state === 'validating' ? (
                 <><span className="spinner" />Validating endpoints…</>
