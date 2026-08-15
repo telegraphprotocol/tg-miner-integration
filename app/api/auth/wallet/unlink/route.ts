@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     await users.updateOne(
       { email: sessionUser.email },
-      { $set: { walletAddress: null, walletUnlinkedAt: now } },
+      { $unset: { walletAddress: '' }, $set: { walletUnlinkedAt: now } },
     );
 
     return NextResponse.json({ ok: true, walletUnlinkCooldownUntil: new Date(now.getTime() + WALLET_UNLINK_COOLDOWN_MS).toISOString() });

@@ -87,7 +87,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthedUser | nul
   return {
     id: user._id!.toString(),
     email: user.email,
-    walletAddress: user.walletAddress,
+    walletAddress: user.walletAddress ?? null,
     walletUnlinkCooldownUntil,
     firstName: user.firstName ?? null,
     lastName: user.lastName ?? null,

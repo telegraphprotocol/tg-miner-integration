@@ -40,7 +40,9 @@ export interface UserDoc {
   _id?: ObjectId;
   email: string;
   passwordHash: string;
-  walletAddress: string | null;
+  /** Omitted entirely (not set to null) when unlinked — the unique index is sparse,
+   *  which only excludes documents missing the field, not documents with value null. */
+  walletAddress?: string | null;
   walletNonce: string | null;
   walletNonceIssuedAt: string | null;
   walletNonceExpiresAt: Date | null;
