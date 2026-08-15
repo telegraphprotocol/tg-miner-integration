@@ -29,7 +29,7 @@ interface Props {
   onDone: () => void;
 }
 
-type Phase = 'select' | 'hashed' | 'uploaded' | 'verified';
+type Phase = 'select' | 'hashed' | 'verified';
 
 export default function WasmWizard({ onDone }: Props) {
   const toast = useToast();
@@ -43,15 +43,11 @@ export default function WasmWizard({ onDone }: Props) {
   const [localHash, setLocalHash] = useState<`0x${string}` | ''>('');
   const [gatewayUrl, setGatewayUrl] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [verifying, setVerifying] = useState(false);
-  const [verifyError, setVerifyError] = useState('');
-  const [selectedIntents, setSelectedIntents] = useState<string[]>([]);
+  const [selectedIntent, setSelectedIntent] = useState<string | null>(null);
 
   const [result, setResult] = useState<{ registrationId: string; intentId: string } | null>(null);
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
-  const walletMismatch = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() !== address.toLowerCase();
-  const noLinkedWallet = !!user && !user.walletAddress;
   const { intents: canonicalIntents, isLoading: intentsLoading, error: intentsError } = useCanonicalIntents();
 
   const {
@@ -69,7 +65,7 @@ export default function WasmWizard({ onDone }: Props) {
       try {
         const [event] = parseEventLogs({
           abi: intentRegistryAbi,
-          eventName: 'IntentRegistered',
+          eventName: 'WasmRegistered',
           logs: registerReceipt.logs,
         });
         const registrationId = event.args.registrationId.toString();
@@ -81,7 +77,7 @@ export default function WasmWizard({ onDone }: Props) {
             intentId,
             wasmUrl: gatewayUrl,
             wasmHash: localHash,
-            intents: selectedIntents,
+            intents: selectedIntent ? [selectedIntent] : [],
             txHash: registerHash ?? '',
             registeredAt: new Date().toISOString(),
           });
@@ -91,7 +87,7 @@ export default function WasmWizard({ onDone }: Props) {
         toast.error('Registered, but could not parse the registration event. Check BaseScan.');
       }
     }
-  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, selectedIntents, registerHash, toast]);
+  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, selectedIntent, registerHash, toast]);
 
   useEffect(() => {
     if (registerError) toast.error(friendlyRevertMessage(registerError.message ?? 'Transaction failed.'));
@@ -124,7 +120,7 @@ export default function WasmWizard({ onDone }: Props) {
         return;
       }
       setGatewayUrl(data.gateway);
-      setPhase('uploaded');
+      setPhase('verified');
       toast.success('Pinned .wasm to IPFS successfully.');
     } catch {
       toast.error('Network error during upload.');
@@ -133,36 +129,14 @@ export default function WasmWizard({ onDone }: Props) {
     }
   };
 
-  const handleVerify = async () => {
-    setVerifying(true);
-    setVerifyError('');
-    try {
-      const res = await fetch(gatewayUrl);
-      if (!res.ok) throw new Error(`Could not re-fetch hosted URL (HTTP ${res.status}).`);
-      const bytes = new Uint8Array(await res.arrayBuffer());
-      const rehash = keccak256(bytes);
-      if (rehash !== localHash) {
-        setVerifyError('Re-hashed bytes do not match the locally computed hash. Do not register this URL.');
-        toast.error('Hash mismatch after hosting — registration blocked.');
-        return;
-      }
-      setPhase('verified');
-      toast.success('Hash verified against hosted bytes.');
-    } catch (err) {
-      setVerifyError((err as Error).message ?? 'Verification failed.');
-    } finally {
-      setVerifying(false);
-    }
-  };
-
   const handleRegister = () => {
-    if (!user?.walletAddress || walletMismatch) return;
+    if (!user || !selectedIntent) return;
     resetRegister();
     writeRegister({
       address: DIAMOND_ADDRESS,
       abi: intentRegistryAbi,
       functionName: 'registerWasm',
-      args: [localHash as `0x${string}`, gatewayUrl, []],
+      args: [localHash as `0x${string}`, gatewayUrl, selectedIntent],
     });
   };
 
@@ -196,10 +170,10 @@ export default function WasmWizard({ onDone }: Props) {
               <span className="result-row-label">INTENT ID</span>
               <span className="result-row-value result-mono result-truncate">{result.intentId}</span>
             </div>
-            {selectedIntents.length > 0 && (
+            {selectedIntent && (
               <div className="wallet-info-row">
-                <span className="result-row-label">SERVES INTENTS</span>
-                <span className="result-row-value">{selectedIntents.join(', ')}</span>
+                <span className="result-row-label">SERVES INTENT</span>
+                <span className="result-row-value">{selectedIntent}</span>
               </div>
             )}
             {registerHash && (
@@ -263,7 +237,7 @@ export default function WasmWizard({ onDone }: Props) {
         <div className="register-card register-card-full">
           <div className="register-card-header">
             <span>2. Pin to IPFS</span>
-            {phase === 'uploaded' || phase === 'verified' ? <span className="badge-success">✓ UPLOADED</span> : null}
+            {phase === 'verified' ? <span className="badge-success">✓ UPLOADED</span> : null}
           </div>
           {phase === 'hashed' && (
             <button className={`btn-fill ${uploading ? 'btn-loading' : ''}`} onClick={handleUpload} disabled={uploading}>
@@ -281,64 +255,41 @@ export default function WasmWizard({ onDone }: Props) {
         </div>
       )}
 
-      {/* Step 3: verify */}
-      {phase === 'uploaded' || phase === 'verified' ? (
-        <div className="register-card register-card-full">
-          <div className="register-card-header">
-            <span>3. Verify Hosted Bytes</span>
-            {phase === 'verified' && <span className="badge-success">✓ VERIFIED</span>}
-          </div>
-          <p className="field-hint" style={{ marginBottom: 12 }}>
-            Re-fetches the hosted URL and recomputes the hash client-side. This must match before you can
-            register.
-          </p>
-          {phase === 'uploaded' && (
-            <button className={`btn-fill ${verifying ? 'btn-loading' : ''}`} onClick={handleVerify} disabled={verifying}>
-              {verifying ? <><Spinner /> Verifying…</> : 'Verify Hash Matches'}
-            </button>
-          )}
-          {verifyError && <p className="field-error" style={{ marginTop: 12 }}>{verifyError}</p>}
-        </div>
-      ) : null}
-
-      {/* Step 4 + 5: whitelisted urls + register */}
+      {/* Step 3 + 4: whitelisted urls + register */}
       {phase === 'verified' && (
         <>
           <div className="register-card register-card-full">
             <div className="register-card-header">
-              <span>4. Intents This Module Serves</span>
-              {selectedIntents.length > 0 && <span className="badge-success">✓ {selectedIntents.length} SELECTED</span>}
+              <span>3. Intent This Module Serves</span>
+              {selectedIntent && <span className="badge-success">✓ SELECTED</span>}
             </div>
             <p className="field-hint" style={{ marginBottom: 12 }}>
-              Which canonical intents is this scorer meant to evaluate? Select one or more. Sourced live
-              from the registry contract so they can never drift out of sync or be mis-spelled.
+              Which canonical intent is this scorer meant to evaluate? Exactly one — sourced live from the
+              registry contract so it can never drift out of sync or be mis-spelled.
             </p>
 
-            {selectedIntents.length > 0 && (
+            {selectedIntent ? (
               <div className="intent-list" style={{ marginBottom: 12 }}>
-                {selectedIntents.map(intent => (
-                  <div key={intent} className="intent-chip">
-                    <span>{intent}</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedIntents(prev => prev.filter(i => i !== intent))}
-                      className="intent-remove"
-                    >
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                    </button>
-                  </div>
-                ))}
+                <div className="intent-chip">
+                  <span>{selectedIntent}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIntent(null)}
+                    className="intent-remove"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                  </button>
+                </div>
               </div>
+            ) : (
+              <IntentSearchList
+                intents={canonicalIntents}
+                isLoading={intentsLoading}
+                error={intentsError}
+                onSelect={intent => setSelectedIntent(intent)}
+                placeholder="Search canonical intents…"
+              />
             )}
-
-            <IntentSearchList
-              intents={canonicalIntents}
-              isLoading={intentsLoading}
-              error={intentsError}
-              excluded={selectedIntents}
-              onSelect={intent => setSelectedIntents(prev => [...prev, intent])}
-              placeholder="Search canonical intents…"
-            />
           </div>
 
           <div className="register-grid">
@@ -393,15 +344,8 @@ export default function WasmWizard({ onDone }: Props) {
                 <p className="field-hint">Connect your wallet and switch to Base Sepolia to continue.</p>
               ) : !user ? (
                 <p className="field-hint">Sign in above to continue.</p>
-              ) : noLinkedWallet ? (
-                <p className="field-error">No wallet linked to your account yet. Link one from your Profile before registering.</p>
-              ) : walletMismatch ? (
-                <p className="field-error">
-                  Connected wallet doesn't match your account's linked wallet
-                  (<span className="result-mono">{user.walletAddress}</span>). Switch wallets to continue.
-                </p>
-              ) : selectedIntents.length === 0 ? (
-                <p className="field-hint">Select at least one intent this module serves above to continue.</p>
+              ) : !selectedIntent ? (
+                <p className="field-hint">Select the intent this module serves above to continue.</p>
               ) : isRegisterInFlight ? (
                 <div className="tx-pending">
                   <div className="tx-pending-inner">

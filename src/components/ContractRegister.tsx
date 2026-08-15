@@ -112,9 +112,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const isSuccess    = isConfirmed;
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
-  const walletMismatch = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() !== address.toLowerCase();
-  const noLinkedWallet = !!user && !user.walletAddress;
-  const canSubmit    = isConnected && !wrongNetwork && !!user && !!user.walletAddress && !walletMismatch && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+  const canSubmit    = isConnected && !wrongNetwork && !!user && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
@@ -274,17 +272,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                     Login
                   </button>
                 </div>
-              )}
-              {!sessionLoading && noLinkedWallet && (
-                <p className="field-error" style={{ marginTop: 12 }}>
-                  No wallet linked to your account yet. Link one from your Profile before registering.
-                </p>
-              )}
-              {!sessionLoading && walletMismatch && (
-                <p className="field-error" style={{ marginTop: 12 }}>
-                  Connected wallet doesn't match your account's linked wallet
-                  (<span className="result-mono">{user!.walletAddress}</span>). Switch wallets to continue.
-                </p>
               )}
             </div>
           )}
@@ -451,7 +438,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 <div className="reg-checklist">
                   {[
                     { label: 'Signed in',             ok: !!user },
-                    { label: 'Wallet linked to account', ok: !!user?.walletAddress && !walletMismatch },
                     { label: 'YAML URL set',         ok: !!effectiveUrl },
                     { label: 'Hash valid (bytes32)',  ok: !!effectiveHash && effectiveHash.length === 66 },
                     { label: 'Fee address set',       ok: !!feeAddress && feeAddress !== '0x0000000000000000000000000000000000000000' },
@@ -487,8 +473,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 {!isConnected       ? 'Connect First'
                   : wrongNetwork    ? 'Switch to Base Sepolia'
                   : !user           ? 'Sign In First'
-                  : noLinkedWallet  ? 'Link a Wallet First'
-                  : walletMismatch  ? 'Wrong Wallet Connected'
                   : !CONTRACT_ADDRESS ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
                   : txError         ? 'Retry Registration'

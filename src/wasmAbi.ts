@@ -6,7 +6,7 @@ export const intentRegistryAbi = [
     inputs: [
       { name: 'wasmHash', type: 'bytes32' },
       { name: 'wasmUrl', type: 'string' },
-      { name: 'whitelistedUrls', type: 'string[]' },
+      { name: 'intent', type: 'string' },
     ],
     outputs: [{ name: 'registrationId', type: 'uint256' }],
   },
@@ -30,7 +30,7 @@ export const intentRegistryAbi = [
       { name: 'intentId', type: 'bytes32' },
       { name: 'wasmHash', type: 'bytes32' },
       { name: 'wasmUrl', type: 'string' },
-      { name: 'whitelistedUrls', type: 'string[]' },
+      { name: 'intent', type: 'string' },
       { name: 'active', type: 'bool' },
       { name: 'bondAmount', type: 'uint256' },
     ],
@@ -83,10 +83,23 @@ export const intentRegistryAbi = [
       { name: 'entityType', type: 'uint8', indexed: false },
     ],
   },
+  {
+    type: 'event',
+    name: 'WasmRegistered',
+    inputs: [
+      { name: 'registrationId', type: 'uint256', indexed: true },
+      { name: 'author', type: 'address', indexed: true },
+      { name: 'intentId', type: 'bytes32', indexed: true },
+      { name: 'intent', type: 'string', indexed: false },
+      { name: 'wasmHash', type: 'bytes32', indexed: false },
+      { name: 'wasmUrl', type: 'string', indexed: false },
+    ],
+  },
 ] as const;
 
 export const DIAMOND_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? '') as `0x${string}`;
-export const ENTITY_MINER = 1;
+export const ENTITY_MINER = 0;
+export const ENTITY_COLLECTOR = 1;
 export const ENTITY_WASM_AUTHOR = 2;
 
 export const TELEGRAPH_NODE_URL = process.env.NEXT_PUBLIC_TELEGRAPH_NODE_URL ?? 'http://13.237.89.59:7044';
@@ -98,8 +111,8 @@ export interface WasmRecordApi {
   WasmHash: string;
   WasmRaw: string | null;
   ActivationStatus: 'pending' | 'active' | 'rejected' | 'superseded' | 'deregistered' | string;
+  /** The intent NAME (e.g. "CHAT_COMPLETION"), not a hex nonce. */
   IntentID: string;
-  WhitelistedURLs: string[];
   BondAmount: number;
   RejectionReason: string | null;
   RegisteredAt: string;
@@ -155,9 +168,9 @@ export interface LeaderboardResponse {
 export const REVERT_MESSAGES: Record<string, string> = {
   'empty hash': 'wasmHash was empty.',
   'empty URL': 'wasmUrl was empty.',
-  'machina token not set': 'Protocol misconfiguration — this is not a user error. Please contact support.',
-  'bond transfer failed': 'Insufficient MACHINA balance or allowance.',
-  'duplicate wasm intentId': 'Same author + same hash registered in the same block. Please retry.',
+  'empty intent': 'Pick an intent — it cannot be blank.',
+  'unsupported intent': 'Not a canonical intent. Choose one from the list.',
+  'duplicate wasm hash': 'You have already registered this exact binary. Deregister it first, or change the binary.',
   'not the registrant': 'Only the original author can deregister this entry.',
   'already deregistered': 'This entry has already been deregistered.',
 };

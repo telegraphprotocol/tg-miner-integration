@@ -65,12 +65,6 @@ function WasmRow({ record, onDeregistered }: {
           <span>REG #{record.RegistrationID}</span>
           <span className="reg-row-sep">·</span>
           <span className="result-mono result-truncate">{record.IntentID}</span>
-          {record.WhitelistedURLs?.length > 0 && (
-            <>
-              <span className="reg-row-sep">·</span>
-              <span>{record.WhitelistedURLs.join(', ')}</span>
-            </>
-          )}
           <span className="reg-row-sep">·</span>
           <span>{new Date(record.RegisteredAt).toLocaleString()}</span>
         </div>
