@@ -25,6 +25,17 @@ type Tab = 'wasm' | 'yaml';
 
 const POLL_INTERVAL_MS = 15000;
 
+function Tip({ text }: { text: string }) {
+  return (
+    <span className="field-tooltip-wrap">
+      <span className="field-tooltip-icon">?</span>
+      <span className="field-tooltip-popup">
+        <span className="field-tooltip-line">{text}</span>
+      </span>
+    </span>
+  );
+}
+
 function statusBadgeClass(status: string): string {
   if (status === 'active') return 'badge-success';
   if (status === 'rejected' || status === 'deregistered') return 'wasm-status-bad';
@@ -193,7 +204,10 @@ export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
 
         <div className="step-section-heading">
           <div className="step-eyebrow">YOUR REGISTRATIONS</div>
-          <h2 className="step-title">Registrations</h2>
+          <h2 className="step-title">
+            Registrations
+            <Tip text="After your transaction confirms, it can take up to 5 minutes for the registry node to index it and show up here." />
+          </h2>
           <p className="step-desc">
             {isConnected
               ? <>Everything registered on-chain by <span className="result-mono">{address}</span>, sourced live from the registry.</>
