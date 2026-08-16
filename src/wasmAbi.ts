@@ -179,5 +179,18 @@ export function friendlyRevertMessage(raw: string): string {
   for (const [key, msg] of Object.entries(REVERT_MESSAGES)) {
     if (raw.includes(key)) return msg;
   }
-  return raw.split('\n')[0] ?? 'Transaction failed.';
+
+  if (/user rejected|user denied/i.test(raw)) return 'Transaction rejected in wallet.';
+
+  // viem puts the actual revert reason on the line(s) AFTER this phrase, not on
+  // the same line — naively taking the first line (as we used to) returns the
+  // empty/truncated phrase itself with no reason attached.
+  const reasonMatch = raw.match(/reverted with the following reason:\s*\n*\s*([^\n]+)/i);
+  if (reasonMatch?.[1]?.trim()) return reasonMatch[1].trim();
+
+  const shortMatch = raw.match(/execution reverted:?\s*([^\n]*)/i);
+  if (shortMatch?.[1]?.trim()) return shortMatch[1].trim();
+
+  const firstNonEmptyLine = raw.split('\n').map(l => l.trim()).find(Boolean);
+  return firstNonEmptyLine || 'Transaction failed.';
 }

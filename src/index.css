@@ -683,6 +683,30 @@ body::before {
 
 .field-input::placeholder { color: rgba(255,255,255,0.22); }
 
+.field-password-wrap {
+  position: relative;
+  display: flex;
+}
+.field-password-wrap .field-input {
+  padding-right: 38px;
+}
+.field-password-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.field-password-toggle:hover { color: #fff; }
+
 .field-textarea {
   resize: vertical;
   min-height: 72px;

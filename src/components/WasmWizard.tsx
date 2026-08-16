@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   useAccount,
   useSwitchChain,
@@ -30,6 +30,18 @@ interface Props {
 }
 
 type Phase = 'select' | 'hashed' | 'verified';
+type SourceMode = 'upload' | 'link';
+
+function Tip({ text }: { text: string }) {
+  return (
+    <span className="field-tooltip-wrap">
+      <span className="field-tooltip-icon">?</span>
+      <span className="field-tooltip-popup">
+        <span className="field-tooltip-line">{text}</span>
+      </span>
+    </span>
+  );
+}
 
 export default function WasmWizard({ onDone }: Props) {
   const toast = useToast();
@@ -38,17 +50,34 @@ export default function WasmWizard({ onDone }: Props) {
   const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
   const [showAuth, setShowAuth] = useState(false);
 
+  const [sourceMode, setSourceMode] = useState<SourceMode>('link');
   const [file, setFile] = useState<File | null>(null);
   const [phase, setPhase] = useState<Phase>('select');
   const [localHash, setLocalHash] = useState<`0x${string}` | ''>('');
   const [gatewayUrl, setGatewayUrl] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkError, setLinkError] = useState('');
   const [selectedIntent, setSelectedIntent] = useState<string | null>(null);
 
   const [result, setResult] = useState<{ registrationId: string; intentId: string } | null>(null);
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
   const { intents: canonicalIntents, isLoading: intentsLoading, error: intentsError } = useCanonicalIntents();
+
+  const resetForm = useCallback(() => {
+    setSourceMode('link');
+    setFile(null);
+    setPhase('select');
+    setLocalHash('');
+    setGatewayUrl('');
+    setUploading(false);
+    setLinkUrl('');
+    setLinkBusy(false);
+    setLinkError('');
+    setSelectedIntent(null);
+  }, []);
 
   const {
     writeContract: writeRegister,
@@ -57,41 +86,57 @@ export default function WasmWizard({ onDone }: Props) {
     error: registerError,
     reset: resetRegister,
   } = useWriteContract();
-  const { data: registerReceipt, isLoading: isRegisterConfirming, isSuccess: isRegisterConfirmed } =
-    useWaitForTransactionReceipt({ hash: registerHash });
+  const {
+    data: registerReceipt,
+    isLoading: isRegisterConfirming,
+    isSuccess: isRegisterConfirmed,
+    error: registerReceiptError,
+  } = useWaitForTransactionReceipt({ hash: registerHash });
 
   useEffect(() => {
-    if (isRegisterConfirmed && registerReceipt && !result) {
-      try {
-        const [event] = parseEventLogs({
-          abi: intentRegistryAbi,
-          eventName: 'WasmRegistered',
-          logs: registerReceipt.logs,
-        });
-        const registrationId = event.args.registrationId.toString();
-        const intentId = event.args.intentId;
-        setResult({ registrationId, intentId });
-        if (address) {
-          addWasmRegistration(address, {
-            registrationId,
-            intentId,
-            wasmUrl: gatewayUrl,
-            wasmHash: localHash,
-            intents: selectedIntent ? [selectedIntent] : [],
-            txHash: registerHash ?? '',
-            registeredAt: new Date().toISOString(),
-          });
-        }
-        toast.success('WASM module registered on-chain successfully.');
-      } catch {
-        toast.error('Registered, but could not parse the registration event. Check BaseScan.');
-      }
+    if (!isRegisterConfirmed || !registerReceipt || result) return;
+
+    if (registerReceipt.status !== 'success') {
+      resetRegister();
+      resetForm();
+      toast.error('Transaction reverted on-chain. No changes were made — check BaseScan for details.');
+      return;
     }
-  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, selectedIntent, registerHash, toast]);
+
+    try {
+      const [event] = parseEventLogs({
+        abi: intentRegistryAbi,
+        eventName: 'WasmRegistered',
+        logs: registerReceipt.logs,
+      });
+      const registrationId = event.args.registrationId.toString();
+      const intentId = event.args.intentId;
+      setResult({ registrationId, intentId });
+      if (address) {
+        addWasmRegistration(address, {
+          registrationId,
+          intentId,
+          wasmUrl: gatewayUrl,
+          wasmHash: localHash,
+          intents: selectedIntent ? [selectedIntent] : [],
+          txHash: registerHash ?? '',
+          registeredAt: new Date().toISOString(),
+        });
+      }
+      toast.success('WASM module registered on-chain successfully.');
+    } catch {
+      toast.error('Registered, but could not parse the registration event. Check BaseScan.');
+    }
+  }, [isRegisterConfirmed, registerReceipt, result, address, gatewayUrl, localHash, selectedIntent, registerHash, toast, resetRegister, resetForm]);
 
   useEffect(() => {
-    if (registerError) toast.error(friendlyRevertMessage(registerError.message ?? 'Transaction failed.'));
-  }, [registerError, toast]);
+    const err = registerError ?? registerReceiptError;
+    if (err) {
+      resetRegister();
+      resetForm();
+      toast.error(friendlyRevertMessage(err.message ?? 'Transaction failed.'));
+    }
+  }, [registerError, registerReceiptError, toast, resetRegister, resetForm]);
 
   const handleFileSelect = async (f: File) => {
     if (f.size > 32 * 1024 * 1024) {
@@ -126,6 +171,38 @@ export default function WasmWizard({ onDone }: Props) {
       toast.error('Network error during upload.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleLinkSubmit = async () => {
+    if (!linkUrl.trim()) return;
+    setLinkError('');
+    try {
+      new URL(linkUrl.trim());
+    } catch {
+      setLinkError('Enter a valid URL.');
+      return;
+    }
+    setLinkBusy(true);
+    try {
+      const res = await fetch('/api/hash-remote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: linkUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLinkError(data.error || 'Could not validate that link.');
+        return;
+      }
+      setLocalHash(data.hash);
+      setGatewayUrl(data.url);
+      setPhase('verified');
+      toast.success('Link verified and hashed successfully.');
+    } catch {
+      setLinkError('Network error. Please try again.');
+    } finally {
+      setLinkBusy(false);
     }
   };
 
@@ -211,19 +288,75 @@ export default function WasmWizard({ onDone }: Props) {
           <span>1. Select &amp; Hash Binary</span>
           {phase !== 'select' && <span className="badge-success">✓ HASHED</span>}
         </div>
-        <div className="field-group">
-          <label className="field-label">.wasm file <span className="field-required">*</span></label>
-          <input
-            type="file"
-            accept=".wasm"
-            className="field-input"
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
-          />
-          <p className="field-hint" style={{ marginTop: 4, fontSize: 11, opacity: 0.55 }}>
-            Must export rank_answer, breakdown_answer, alloc, dealloc, and linear memory — invalid modules
-            are rejected on arrival. Max 32 MB.
-          </p>
+
+        <div className="sub-tabs" style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            className={`sub-tab ${sourceMode === 'link' ? 'sub-tab-active' : ''}`}
+            onClick={() => { setSourceMode('link'); setLinkError(''); }}
+            disabled={phase !== 'select'}
+          >
+            Paste Link
+            <Tip text="Faster than uploading here — host your .wasm on any free file-sharing service (Dropbox, Mega, etc.), then paste the public link." />
+          </button>
+          <button
+            type="button"
+            className={`sub-tab ${sourceMode === 'upload' ? 'sub-tab-active' : ''}`}
+            onClick={() => { setSourceMode('upload'); setLinkError(''); }}
+            disabled={phase !== 'select'}
+          >
+            Upload File
+          </button>
         </div>
+
+        {sourceMode === 'upload' ? (
+          <div className="field-group">
+            <label className="field-label">.wasm file <span className="field-required">*</span></label>
+            <input
+              type="file"
+              accept=".wasm"
+              className="field-input"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileSelect(f); }}
+              disabled={phase !== 'select'}
+            />
+            <p className="field-hint" style={{ marginTop: 4, fontSize: 11, opacity: 0.55 }}>
+              Must export rank_answer, breakdown_answer, alloc, dealloc, and linear memory — invalid modules
+              are rejected on arrival. Max 32 MB.
+            </p>
+          </div>
+        ) : (
+          <div className="field-group">
+            <label className="field-label">Hosted file link <span className="field-required">*</span></label>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input
+                className="field-input"
+                type="url"
+                placeholder="https://www.dropbox.com/scl/fi/.../scorer.wasm?dl=0"
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                disabled={linkBusy || phase !== 'select'}
+                style={{ flex: 1 }}
+              />
+              {phase === 'select' && (
+                <button
+                  type="button"
+                  className={`btn-fill ${linkBusy ? 'btn-loading' : ''}`}
+                  onClick={handleLinkSubmit}
+                  disabled={linkBusy || !linkUrl.trim()}
+                >
+                  {linkBusy ? <><Spinner /> Verifying…</> : 'Verify & Hash'}
+                </button>
+              )}
+            </div>
+            <p className="field-hint" style={{ marginTop: 4, fontSize: 11, opacity: 0.55 }}>
+              Faster than uploading here. Host your .wasm on any free file-sharing service — Dropbox, Mega,
+              and similar all work — just make sure the link is public. We'll verify it's downloadable before
+              hashing.
+            </p>
+            {linkError && <p className="field-error" style={{ marginTop: 8 }}>{linkError}</p>}
+          </div>
+        )}
+
         {localHash && (
           <div className="wallet-info-row">
             <span className="result-row-label">KECCAK256</span>
@@ -232,8 +365,8 @@ export default function WasmWizard({ onDone }: Props) {
         )}
       </div>
 
-      {/* Step 2: upload */}
-      {phase !== 'select' && (
+      {/* Step 2: upload (upload mode only — link mode already has a hosted, hashed URL) */}
+      {sourceMode === 'upload' && phase !== 'select' && (
         <div className="register-card register-card-full">
           <div className="register-card-header">
             <span>2. Pin to IPFS</span>
@@ -252,6 +385,21 @@ export default function WasmWizard({ onDone }: Props) {
               </a>
             </div>
           )}
+        </div>
+      )}
+
+      {sourceMode === 'link' && phase === 'verified' && (
+        <div className="register-card register-card-full">
+          <div className="register-card-header">
+            <span>2. Hosted Link</span>
+            <span className="badge-success">✓ VERIFIED</span>
+          </div>
+          <div className="wallet-info-row">
+            <span className="result-row-label">DIRECT URL</span>
+            <a className="result-row-link result-mono result-truncate" href={gatewayUrl} target="_blank" rel="noopener noreferrer">
+              {gatewayUrl}
+            </a>
+          </div>
         </div>
       )}
 

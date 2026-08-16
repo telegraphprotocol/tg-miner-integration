@@ -10,6 +10,7 @@ import AuthModal from './AuthModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { useSession } from '../hooks/useSession';
+import { friendlyRevertMessage } from '../wasmAbi';
 
 const REGISTRY_ABI = [
   {
@@ -102,6 +103,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
   const { writeContract, data: txHash, isPending: isWritePending, error: writeError, reset } = useWriteContract();
   const {
+    data: receipt,
     isLoading: isConfirming,
     isSuccess: isConfirmed,
     isError: isReceiptError,
@@ -109,14 +111,17 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   } = useWaitForTransactionReceipt({ hash: txHash });
 
   const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
-  const isSuccess    = isConfirmed;
+  const isSuccess    = isConfirmed && receipt?.status === 'success';
+  const isReverted   = isConfirmed && receipt?.status !== 'success';
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
   const canSubmit    = isConnected && !wrongNetwork && !!user && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
-    if (isSuccess && txHash && toastedTxRef.current !== txHash) {
+    if (!txHash || toastedTxRef.current === txHash) return;
+
+    if (isSuccess) {
       toastedTxRef.current = txHash;
       toast.success('Miner registered on-chain successfully.');
       if (address) {
@@ -130,11 +135,15 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
           registeredAt: new Date().toISOString(),
         });
       }
+    } else if (isReverted) {
+      toastedTxRef.current = txHash;
+      reset();
+      toast.error('Transaction reverted on-chain. No changes were made — check BaseScan for details.');
     }
-  }, [isSuccess, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents]);
+  }, [isSuccess, isReverted, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents, reset]);
 
   useEffect(() => {
-    if (txError) toast.error(txError.message?.split('\n')[0] ?? 'Transaction failed.');
+    if (txError) toast.error(friendlyRevertMessage(txError.message ?? 'Transaction failed.'));
   }, [txError, toast]);
 
   const handleRegister = () => {

@@ -16,6 +16,20 @@ interface Props {
 type Tab = 'signup' | 'login';
 type SignupPhase = 'email' | 'code';
 
+function EyeIcon({ open }: { open: boolean }) {
+  return open ? (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ) : (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.9 19.9 0 0 1 5.06-5.94M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a19.9 19.9 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
 export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaultTab = 'signup' }: Props) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>(defaultTab);
@@ -37,12 +51,14 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
   const [signupToken, setSignupToken] = useState('');
   const [otp, setOtp] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupError, setSignupError] = useState('');
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [magicSent, setMagicSent] = useState(false);
@@ -211,13 +227,24 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
                   autoFocus
                 />
                 <label className="field-label" style={{ marginTop: 12 }}>Password</label>
-                <input
-                  className="field-input"
-                  type="password"
-                  placeholder="At least 8 characters"
-                  value={signupPassword}
-                  onChange={e => setSignupPassword(e.target.value)}
-                />
+                <div className="field-password-wrap">
+                  <input
+                    className="field-input"
+                    type={showSignupPassword ? 'text' : 'password'}
+                    placeholder="At least 8 characters"
+                    value={signupPassword}
+                    onChange={e => setSignupPassword(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="field-password-toggle"
+                    onClick={() => setShowSignupPassword(v => !v)}
+                    aria-label={showSignupPassword ? 'Hide password' : 'Show password'}
+                    tabIndex={-1}
+                  >
+                    <EyeIcon open={showSignupPassword} />
+                  </button>
+                </div>
                 <p className="field-hint" style={{ marginTop: 4 }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
                 {signupError && <p className="field-error">{signupError}</p>}
                 <button
@@ -252,14 +279,25 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
               autoFocus
             />
             <label className="field-label" style={{ marginTop: 12 }}>Password</label>
-            <input
-              className="field-input"
-              type="password"
-              placeholder="••••••••"
-              value={loginPassword}
-              onChange={e => setLoginPassword(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-            />
+            <div className="field-password-wrap">
+              <input
+                className="field-input"
+                type={showLoginPassword ? 'text' : 'password'}
+                placeholder="••••••••"
+                value={loginPassword}
+                onChange={e => setLoginPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+              />
+              <button
+                type="button"
+                className="field-password-toggle"
+                onClick={() => setShowLoginPassword(v => !v)}
+                aria-label={showLoginPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                <EyeIcon open={showLoginPassword} />
+              </button>
+            </div>
             {loginError && <p className="field-error">{loginError}</p>}
             <button
               type="button"
