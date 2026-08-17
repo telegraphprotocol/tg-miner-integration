@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
       xUsername: null,
       profileLocked: false,
       createdAt: new Date(),
+      failedLoginAttempts: 0,
+      loginLockedUntil: null,
     });
 
     const session = await signSession({ userId: result.insertedId.toString(), email });

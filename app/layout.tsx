@@ -17,7 +17,7 @@ export const metadata: Metadata = {
         url: '/telegraph-social-card.jpg',
         width: 1200,
         height: 630,
-        alt: 'Telegraph Protocol',
+        alt: 'Telegraph',
       },
     ],
     type: 'website',

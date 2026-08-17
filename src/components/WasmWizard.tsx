@@ -320,7 +320,7 @@ export default function WasmWizard({ onDone }: Props) {
               disabled={phase !== 'select'}
             />
             <p className="field-hint" style={{ marginTop: 4, fontSize: 11, opacity: 0.55 }}>
-              Must export rank_answer, breakdown_answer, alloc, dealloc, and linear memory — invalid modules
+              Must export rank_answer, alloc, dealloc, and linear memory — invalid modules
               are rejected on arrival. Max 32 MB.
             </p>
           </div>

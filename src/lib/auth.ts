@@ -54,6 +54,15 @@ export async function signSession(payload: SessionPayload): Promise<string> {
 
 export const WALLET_UNLINK_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
 
+export const LOGIN_MAX_ATTEMPTS = 5;
+export const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
+
+/** Clears any failed-login lockout — called on a successful login and after a password reset. */
+export async function resetLoginLockout(email: string): Promise<void> {
+  const users = await getUsersCollection();
+  await users.updateOne({ email }, { $set: { failedLoginAttempts: 0, loginLockedUntil: null } });
+}
+
 export interface AuthedUser {
   id: string;
   email: string;

@@ -7,8 +7,8 @@ import { useLeaderboard } from '../hooks/useLeaderboard';
 interface Props {
   limit?: number;
   className?: string;
-  /** Anchor to scroll to for the "Get Ranked" CTA — defaults to the root registration cards. */
-  getRankedHref?: string;
+  /** Called when the "Get Ranked" CTA is clicked — defaults to scrolling to the root registration cards. */
+  onGetRanked?: () => void;
 }
 
 const AUTO_REFRESH_MS = 15000;
@@ -21,7 +21,7 @@ function rankClass(rank: number): string {
   return '';
 }
 
-export default function LiveLeaderboard({ limit = 10, className, getRankedHref = '#root-cards' }: Props) {
+export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: Props) {
   const { byIntent, isLoading, error, refetch } = useLeaderboard(limit);
   const [intentFilter, setIntentFilter] = useState('');
   const [changedSlugs, setChangedSlugs] = useState<Set<string>>(new Set());
@@ -74,7 +74,7 @@ export default function LiveLeaderboard({ limit = 10, className, getRankedHref =
           <span className="lb-panel-title">Live Leaderboard</span>
         </div>
         <p className="lb-panel-sub">
-          Top miners earn daily Machina rewards from the treasury — integrate and climb the ranks.
+          Top-ranked APIs win the most requests every day — integrate and climb the ranks.
         </p>
       </div>
 
@@ -98,9 +98,13 @@ export default function LiveLeaderboard({ limit = 10, className, getRankedHref =
           </div>
         )}
         <div className="lb-panel-actions">
-          <a className="io-btn io-btn-accent" href={getRankedHref}>
+          <button
+            type="button"
+            className="io-btn io-btn-accent"
+            onClick={() => onGetRanked ? onGetRanked() : document.getElementById('root-cards')?.scrollIntoView({ behavior: 'smooth' })}
+          >
             Get Ranked →
-          </a>
+          </button>
         </div>
       </div>
 
@@ -122,7 +126,7 @@ export default function LiveLeaderboard({ limit = 10, className, getRankedHref =
             <thead>
               <tr>
                 <th className="lb-col-rank">Rank</th>
-                <th>Miner</th>
+                <th>API</th>
                 <th>Status</th>
                 <th className="lb-col-num">Score</th>
               </tr>

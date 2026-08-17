@@ -64,6 +64,16 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
   const [magicSent, setMagicSent] = useState(false);
   const [magicBusy, setMagicBusy] = useState(false);
 
+  // Forgot-password state — null means not in reset mode (showing the normal login form)
+  const [resetPhase, setResetPhase] = useState<'email' | 'code' | null>(null);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState('');
+
   const handleRequestOtp = async () => {
     setSignupError('');
     if (!signupEmail.trim()) { setSignupError('Enter your email.'); return; }
@@ -150,6 +160,61 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
       setLoginError('Network error. Please try again.');
     } finally {
       setMagicBusy(false);
+    }
+  };
+
+  const openForgotPassword = () => {
+    setResetError('');
+    setResetEmail(loginEmail);
+    setResetPhase('email');
+  };
+
+  const handleRequestReset = async () => {
+    setResetError('');
+    if (!resetEmail.trim()) { setResetError('Enter your email.'); return; }
+    setResetBusy(true);
+    try {
+      const res = await fetch('/api/auth/password-reset/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setResetError(data.error || 'Could not send code.'); return; }
+      setResetToken(data.token);
+      setResetPhase('code');
+      toast.success('Reset code sent — check your inbox.');
+    } catch {
+      setResetError('Network error. Please try again.');
+    } finally {
+      setResetBusy(false);
+    }
+  };
+
+  const handleVerifyReset = async () => {
+    setResetError('');
+    if (!resetOtp.trim() || !resetPassword) { setResetError('Enter the code and a new password.'); return; }
+    const passwordError = validatePasswordStrength(resetPassword);
+    if (passwordError) { setResetError(passwordError); return; }
+    setResetBusy(true);
+    try {
+      const res = await fetch('/api/auth/password-reset/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, otp: resetOtp.trim(), password: resetPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setResetError(data.error || 'Could not reset password.'); return; }
+      toast.success('Password reset — sign in with your new password.');
+      setResetPhase(null);
+      setLoginEmail(resetEmail);
+      setLoginPassword('');
+      setResetOtp('');
+      setResetPassword('');
+    } catch {
+      setResetError('Network error. Please try again.');
+    } finally {
+      setResetBusy(false);
     }
   };
 
@@ -267,6 +332,93 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
               </>
             )}
           </div>
+        ) : resetPhase === 'email' ? (
+          <div className="field-group">
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              Enter your email and we'll send you a code to reset your password.
+            </p>
+            <label className="field-label">Email</label>
+            <input
+              className="field-input"
+              type="email"
+              placeholder="you@example.com"
+              value={resetEmail}
+              onChange={e => setResetEmail(e.target.value)}
+              autoFocus
+            />
+            {resetError && <p className="field-error">{resetError}</p>}
+            <button
+              type="button"
+              className={`btn-fill btn-full ${resetBusy ? 'btn-loading' : ''}`}
+              onClick={handleRequestReset}
+              disabled={resetBusy}
+              style={{ marginTop: 8 }}
+            >
+              {resetBusy ? <><Spinner /> Sending…</> : 'Send reset code'}
+            </button>
+            <button
+              type="button"
+              className="inline-link-btn"
+              style={{ marginTop: 10 }}
+              onClick={() => setResetPhase(null)}
+            >
+              Back to login
+            </button>
+          </div>
+        ) : resetPhase === 'code' ? (
+          <div className="field-group">
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              Enter the code sent to <span className="result-mono">{resetEmail}</span> and choose a new password.
+            </p>
+            <label className="field-label">Reset code</label>
+            <input
+              className="field-input field-mono"
+              inputMode="numeric"
+              maxLength={6}
+              placeholder="123456"
+              value={resetOtp}
+              onChange={e => setResetOtp(e.target.value)}
+              autoFocus
+            />
+            <label className="field-label" style={{ marginTop: 12 }}>New password</label>
+            <div className="field-password-wrap">
+              <input
+                className="field-input"
+                type={showResetPassword ? 'text' : 'password'}
+                placeholder="At least 8 characters"
+                value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="field-password-toggle"
+                onClick={() => setShowResetPassword(v => !v)}
+                aria-label={showResetPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                <EyeIcon open={showResetPassword} />
+              </button>
+            </div>
+            <p className="field-hint" style={{ marginTop: 4 }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
+            {resetError && <p className="field-error">{resetError}</p>}
+            <button
+              type="button"
+              className={`btn-fill btn-full ${resetBusy ? 'btn-loading' : ''}`}
+              onClick={handleVerifyReset}
+              disabled={resetBusy}
+              style={{ marginTop: 8 }}
+            >
+              {resetBusy ? <><Spinner /> Resetting…</> : 'Reset password'}
+            </button>
+            <button
+              type="button"
+              className="inline-link-btn"
+              style={{ marginTop: 10 }}
+              onClick={() => { setResetPhase('email'); setResetOtp(''); }}
+            >
+              Use a different email
+            </button>
+          </div>
         ) : (
           <div className="field-group">
             <label className="field-label">Email</label>
@@ -309,7 +461,10 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
               {loginBusy ? <><Spinner /> Signing in…</> : 'Sign In'}
             </button>
 
-            <div style={{ textAlign: 'center', marginTop: 14 }}>
+            <div style={{ textAlign: 'center', marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button type="button" className="inline-link-btn" onClick={openForgotPassword}>
+                Forgot password?
+              </button>
               {magicSent ? (
                 <p className="field-hint">Check <span className="result-mono">{loginEmail}</span> for a sign-in link.</p>
               ) : (

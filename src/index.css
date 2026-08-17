@@ -4744,6 +4744,34 @@ body::before {
   margin-top: 2px;
 }
 
+.lv2-hero-cta-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  padding: 12px 26px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(120, 255, 160, 0.6);
+  background: var(--success);
+  color: #04140a;
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 8px 24px -10px rgba(120, 255, 160, 0.5);
+}
+.lv2-hero-cta-primary:hover {
+  background: rgba(120, 255, 160, 1);
+  border-color: rgba(120, 255, 160, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px -8px rgba(120, 255, 160, 0.6);
+}
+.lv2-hero-cta-primary:active {
+  transform: translateY(0);
+}
+
 .inline-link-btn {
   background: none;
   border: none;

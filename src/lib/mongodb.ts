@@ -55,6 +55,10 @@ export interface UserDoc {
   /** Once true, firstName/lastName/discordUsername/xUsername are permanent — set after the first save. */
   profileLocked: boolean;
   createdAt: Date;
+  /** Consecutive wrong-password count since the last success or lockout. */
+  failedLoginAttempts: number;
+  /** Login is rejected outright while this is in the future. */
+  loginLockedUntil: Date | null;
 }
 
 let indexesEnsured = false;
@@ -69,6 +73,31 @@ export async function getUsersCollection() {
       col.createIndex({ walletAddress: 1 }, { unique: true, sparse: true }),
     ]).catch(err => {
       indexesEnsured = false;
+      throw err;
+    });
+  }
+  return col;
+}
+
+export interface RateLimitDoc {
+  _id?: ObjectId;
+  key: string;
+  count: number;
+  expiresAt: Date;
+}
+
+let rateLimitIndexEnsured = false;
+
+export async function getRateLimitsCollection() {
+  const db = await getDb();
+  const col = db.collection<RateLimitDoc>('rate_limits');
+  if (!rateLimitIndexEnsured) {
+    rateLimitIndexEnsured = true;
+    await Promise.all([
+      col.createIndex({ key: 1 }, { unique: true }),
+      col.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+    ]).catch(err => {
+      rateLimitIndexEnsured = false;
       throw err;
     });
   }

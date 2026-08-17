@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { signToken } from '@/lib/auth';
-import { sendMagicLinkEmail } from '@/lib/email';
+import { sendPasswordResetEmail } from '@/lib/email';
 import { getUsersCollection } from '@/lib/mongodb';
 import { checkRateLimit, getClientIp, retryAfterMessage } from '@/lib/rateLimit';
 
@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
 
     const ip = getClientIp(req);
     const [ipLimit, emailLimit] = await Promise.all([
-      checkRateLimit(`magiclink:${ip}`, 10, 60 * 60 * 1000),
-      checkRateLimit(`magiclink:${normalizedEmail}`, 3, 60 * 60 * 1000),
+      checkRateLimit(`pwreset-otp:${ip}`, 10, 60 * 60 * 1000),
+      checkRateLimit(`pwreset-otp:${normalizedEmail}`, 3, 60 * 60 * 1000),
     ]);
     if (!ipLimit.ok || !emailLimit.ok) {
       return NextResponse.json(
@@ -24,20 +24,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Always respond the same way regardless of whether the account exists,
-    // so this endpoint can't be used to enumerate registered emails.
+    // A token is always issued and the response shape never varies by whether
+    // the account exists — only the email-send below is conditional — so this
+    // endpoint can't be used to enumerate registered emails via response shape.
     const users = await getUsersCollection();
     const user = await users.findOne({ email: normalizedEmail });
 
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const token = await signToken({ email: normalizedEmail, otp }, 'password-reset', '10m');
+
     if (user) {
-      const token = await signToken({ email: normalizedEmail }, 'magiclink', '15m');
-      const link = `${req.nextUrl.origin}/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`;
-      await sendMagicLinkEmail(normalizedEmail, link);
+      await sendPasswordResetEmail(normalizedEmail, otp);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, token });
   } catch (err) {
-    console.error('[magic-link/request]', err);
-    return NextResponse.json({ error: 'Failed to send link. Please try again.' }, { status: 500 });
+    console.error('[password-reset/request-otp]', err);
+    return NextResponse.json({ error: 'Failed to send code. Please try again.' }, { status: 500 });
   }
 }

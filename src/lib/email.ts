@@ -48,6 +48,27 @@ export async function sendOtpEmail(to: string, otp: string): Promise<void> {
   });
 }
 
+export async function sendPasswordResetEmail(to: string, otp: string): Promise<void> {
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: `"Telegraph" <${process.env.OUTLOOK_USER}>`,
+    to,
+    subject: 'Your Telegraph password reset code',
+    html: emailShell(
+      'Telegraph · Reset your password',
+      `
+        <p style="font-size:15px;margin:0 0 32px;color:rgba(255,255,255,0.8);">
+          Your password reset code is:
+        </p>
+        <p style="font-size:48px;font-weight:700;letter-spacing:0.12em;color:rgba(120,255,160,0.95);margin:0 0 32px;">
+          ${otp}
+        </p>
+      `,
+      "This code expires in 10 minutes. If you didn't request this, ignore this email — your password will stay unchanged.",
+    ),
+  });
+}
+
 export async function sendMagicLinkEmail(to: string, link: string): Promise<void> {
   const transporter = getTransporter();
   await transporter.sendMail({

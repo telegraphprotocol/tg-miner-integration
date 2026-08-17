@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSession } from '../hooks/useSession';
 import AuthModal from './AuthModal';
 import Spinner from './Spinner';
+import { useOpenAuthSignal, type AuthTab } from '../hooks/useOpenAuthSignal';
 
 interface Props {
   onOpenDashboard: () => void;
@@ -13,8 +14,15 @@ interface Props {
 export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props) {
   const { user, isLoading, refetch, logout } = useSession();
   const [open, setOpen] = useState(false);
+  const [authTab, setAuthTab] = useState<AuthTab>('login');
   const [loggingOut, setLoggingOut] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  useOpenAuthSignal(tab => {
+    if (user) return;
+    setAuthTab(tab);
+    setOpen(true);
+  });
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -108,8 +116,8 @@ export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props)
   }
 
   return (
-    <div className="account-btn-wrap">
-      <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setOpen(v => !v)}>
+    <div className="account-btn-wrap" ref={wrapRef}>
+      <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => { setAuthTab('login'); setOpen(v => !v); }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
           <circle cx="12" cy="7" r="4" />
@@ -119,7 +127,7 @@ export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props)
       {open && (
         <AuthModal
           variant="dropdown"
-          defaultTab="login"
+          defaultTab={authTab}
           onClose={() => setOpen(false)}
           onAuthed={() => { setOpen(false); refetch(); }}
         />

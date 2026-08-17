@@ -3,10 +3,12 @@
 import { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { emitIntentSignal } from '../hooks/useIntentSignal';
+import { emitOpenAuthSignal } from '../hooks/useOpenAuthSignal';
 import WalletBar from './WalletBar';
 import LiveLeaderboard from './LiveLeaderboard';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
+import { useSession } from '../hooks/useSession';
 
 interface Props {
   onCreate: () => void;
@@ -23,7 +25,7 @@ const CARDS = [
     key: 'create',
     step: '01',
     title: 'Create YAML',
-    desc: 'Build a new miner config from scratch using the step-by-step wizard.',
+    desc: 'Build a new API config from scratch using the step-by-step wizard.',
     cta: 'Start building →',
     tags: ['Wizard', 'From scratch'],
   },
@@ -51,7 +53,7 @@ const ROOT_CARDS = [
     title: 'Connect API',
     desc: 'Hook your API in 2 minutes. Get ranked, race to the top of the leaderboard, and compete to win paid requests directly from machines & agents.',
     cta: 'Continue →',
-    tags: ['Miner', 'Available now'],
+    tags: ['API', 'Available now'],
     gated: false,
   },
   {
@@ -76,6 +78,7 @@ type Choice = 'root' | 'yaml';
 
 export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onOpenProfile, onRegisterWasm, onOpenIntegrate }: Props) {
   const { isConnected } = useAccount();
+  const { user } = useSession();
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [choice, setChoice] = useState<Choice>('root');
@@ -135,12 +138,39 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
       <div className="lv2-hero">
         <div className="lv2-tagline">
           <span className="lv2-tagline-pip" />
-          See how your API gets scored
+          Live Leaderboard · Open Integration
           <span className="lv2-tagline-pip" />
         </div>
 
         {choice === 'root' && (
           <>
+            <div className="lv2-hero-copy">
+              <h1 className="lv2-hero-headline">
+                Get your API discovered, ranked, and <span className="lv2-hero-accent">paid</span> — automatically.
+              </h1>
+              <p className="lv2-hero-sub">
+                Hook up your API in minutes. Compete on a live leaderboard, win requests from autonomous
+                agents, and get paid per call — no sales calls, no negotiating.
+              </p>
+              <button
+                type="button"
+                className="lv2-hero-cta-primary"
+                onClick={() => {
+                  emitIntentSignal();
+                  if (user) {
+                    setChoice('yaml');
+                  } else {
+                    // AccountButton (and the modal it opens) lives inside the mobile hamburger
+                    // panel — it's off-screen until that panel itself is open.
+                    setMenuOpen(true);
+                    emitOpenAuthSignal('signup');
+                  }
+                }}
+              >
+                Register Now →
+              </button>
+            </div>
+
             <div className="lv2-cards-block" id="root-cards">
               <div className="lv2-cards lv2-cards-root">
                 {ROOT_CARDS.map(card => {
@@ -148,6 +178,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
                   return (
                   <button
                     key={card.key}
+                    id={card.key === 'yaml' ? 'root-card-yaml' : undefined}
                     type="button"
                     className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${locked ? ' lv2-card-disabled' : ''}`}
                     disabled={locked}
@@ -182,7 +213,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
               </div>
             </div>
 
-            <LiveLeaderboard limit={6} className="lv2-leaderboard" />
+            <LiveLeaderboard limit={6} className="lv2-leaderboard" onGetRanked={() => { emitIntentSignal(); rootHandlers.yaml(); }} />
           </>
         )}
 
