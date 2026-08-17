@@ -16,9 +16,10 @@ import SignupNudge from './components/SignupNudge';
 import { ToastProvider, useToast } from './components/Toast';
 import { DEFAULT_FORM } from './formState';
 import type { Step, FormState, PinataResult } from './types';
+import type { MinerRecordApi } from './wasmAbi';
 import { generateYaml } from './yamlGen';
 
-type View = 'landing' | 'app' | 'dashboard' | 'profile' | 'wasm' | 'integrate';
+type View = 'landing' | 'app' | 'dashboard' | 'profile' | 'wasm' | 'integrate' | 'editMiner';
 
 function AppInner() {
   const toast = useToast();
@@ -29,6 +30,7 @@ function AppInner() {
   const [showImport, setShowImport] = useState(false);
   // tracks where to land after import: wizard (step 1) or upload (step 2)
   const [importTarget, setImportTarget] = useState<1 | 2>(1);
+  const [editMinerRecord, setEditMinerRecord] = useState<MinerRecordApi | null>(null);
 
   const handleChange = (key: keyof FormState, value: unknown) => {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -100,8 +102,31 @@ function AppInner() {
     return (
       <>
         <AppBackground />
-        <Dashboard onGoHome={() => setView('landing')} onOpenProfile={() => setView('profile')} />
+        <Dashboard
+          onGoHome={() => setView('landing')}
+          onOpenProfile={() => setView('profile')}
+          onEditMiner={record => { setEditMinerRecord(record); setView('editMiner'); }}
+        />
       </>
+    );
+  }
+
+  if (view === 'editMiner' && editMinerRecord) {
+    return (
+      <div className="app">
+        <AppBackground />
+        <Header onGoHome={() => setView('landing')} onOpenDashboard={() => setView('dashboard')} onOpenProfile={() => setView('profile')} onBack={() => setView('dashboard')} />
+        <div className="app-body">
+          <ContractRegister
+            yaml=""
+            pinataResult={null}
+            intents={[]}
+            minPriceUsdc=""
+            editRecord={editMinerRecord}
+            onBack={() => setView('dashboard')}
+          />
+        </div>
+      </div>
     );
   }
 

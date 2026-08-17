@@ -12,6 +12,40 @@ export const intentRegistryAbi = [
   },
   {
     type: 'function',
+    name: 'registerMiner',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'yamlUrl', type: 'string' },
+      { name: 'yamlHash', type: 'bytes32' },
+      { name: 'feeAddress', type: 'address' },
+      { name: 'minPriceUsdc', type: 'uint256' },
+      { name: 'supportedIntents', type: 'string[]' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'updateMiner',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'oldRegistrationId', type: 'uint256' },
+      { name: 'yamlUrl', type: 'string' },
+      { name: 'yamlHash', type: 'bytes32' },
+      { name: 'feeAddress', type: 'address' },
+      { name: 'minPriceUsdc', type: 'uint256' },
+      { name: 'supportedIntents', type: 'string[]' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'deregisterMiner',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'registrationId', type: 'uint256' }],
+    outputs: [],
+  },
+  {
+    type: 'function',
     name: 'deregisterEntity',
     stateMutability: 'nonpayable',
     inputs: [
@@ -81,6 +115,19 @@ export const intentRegistryAbi = [
       { name: 'registrationId', type: 'uint256', indexed: true },
       { name: 'registrant', type: 'address', indexed: true },
       { name: 'entityType', type: 'uint8', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'MinerRegistered',
+    inputs: [
+      { name: 'registrationId', type: 'uint256', indexed: true },
+      { name: 'miner', type: 'address', indexed: true },
+      { name: 'yamlUrl', type: 'string', indexed: false },
+      { name: 'yamlHash', type: 'bytes32', indexed: false },
+      { name: 'feeAddress', type: 'address', indexed: false },
+      { name: 'minPriceUsdc', type: 'uint256', indexed: false },
+      { name: 'supportedIntents', type: 'string[]', indexed: false },
     ],
   },
   {
@@ -170,6 +217,7 @@ export const REVERT_MESSAGES: Record<string, string> = {
   'empty URL': 'wasmUrl was empty.',
   'empty intent': 'Pick an intent — it cannot be blank.',
   'unsupported intent': 'Not a canonical intent. Choose one from the list.',
+  'MinerRegistryFacet: unsupported intent': 'Not a canonical intent. Choose one from the list.',
   'duplicate wasm hash': 'You have already registered this exact binary. Deregister it first, or change the binary.',
   'not the registrant': 'Only the original author can deregister this entry.',
   'already deregistered': 'This entry has already been deregistered.',

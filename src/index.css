@@ -4289,6 +4289,15 @@ body::before {
   color: rgba(100,180,255,0.8);
 }
 
+.reg-info-panel-warn {
+  background: rgba(255,200,80,0.05);
+  border-color: rgba(255,200,80,0.18);
+}
+
+.reg-info-title-warn {
+  color: rgba(255,200,80,0.85);
+}
+
 .reg-info-list {
   display: flex;
   flex-direction: column;
@@ -4724,6 +4733,20 @@ body::before {
 
 .lv2-hero-accent {
   color: var(--success);
+}
+
+.lv2-hero-prize-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(120, 255, 160, 0.35);
+  background: rgba(120, 255, 160, 0.08);
+  color: var(--success);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .lv2-hero-sub {

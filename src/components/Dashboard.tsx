@@ -8,7 +8,6 @@ import { useToast } from './Toast';
 import { useAddressRegistrations } from '../hooks/useAddressRegistrations';
 import {
   DIAMOND_ADDRESS,
-  ENTITY_MINER,
   ENTITY_WASM_AUTHOR,
   friendlyRevertMessage,
   intentRegistryAbi,
@@ -19,22 +18,12 @@ import {
 interface Props {
   onGoHome: () => void;
   onOpenProfile: () => void;
+  onEditMiner: (record: MinerRecordApi) => void;
 }
 
 type Tab = 'wasm' | 'yaml';
 
 const POLL_INTERVAL_MS = 15000;
-
-function Tip({ text }: { text: string }) {
-  return (
-    <span className="field-tooltip-wrap">
-      <span className="field-tooltip-icon">?</span>
-      <span className="field-tooltip-popup">
-        <span className="field-tooltip-line">{text}</span>
-      </span>
-    </span>
-  );
-}
 
 function statusBadgeClass(status: string): string {
   if (status === 'active') return 'badge-success';
@@ -111,28 +100,54 @@ function WasmRow({ record, onDeregistered }: {
   );
 }
 
-function MinerRow({ record, onDeregistered }: {
+function MinerRow({ record, onDeregistered, onEdit }: {
   record: MinerRecordApi;
   onDeregistered: () => void;
+  onEdit: () => void;
 }) {
   const toast = useToast();
+  const [confirming, setConfirming] = useState(false);
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const isSuccess = isConfirmed && receipt?.status === 'success';
+  const isReverted = isConfirmed && receipt?.status !== 'success';
 
   useEffect(() => {
     if (isSuccess) {
       toast.success('Miner deregistered.');
       onDeregistered();
+    } else if (isReverted) {
+      reset();
+      toast.error('Transaction reverted on-chain. No changes were made — check BaseScan for details.');
     }
-  }, [isSuccess, toast, onDeregistered]);
+  }, [isSuccess, isReverted, toast, onDeregistered, reset]);
 
   useEffect(() => {
     if (error) toast.error(friendlyRevertMessage(error.message ?? 'Transaction failed.'));
   }, [error, toast]);
 
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
   const status = record.ActivationStatus;
   const inFlight = isPending || isConfirming;
   const deregisterable = status !== 'deregistered';
+
+  const handleDeregisterClick = () => {
+    if (!confirming) { setConfirming(true); return; }
+    setConfirming(false);
+    reset();
+    writeContract({
+      address: DIAMOND_ADDRESS,
+      abi: intentRegistryAbi,
+      functionName: 'deregisterMiner',
+      args: [BigInt(record.RegistrationID)],
+    });
+  };
 
   return (
     <div className="reg-row">
@@ -154,26 +169,19 @@ function MinerRow({ record, onDeregistered }: {
         </div>
       </div>
       <div className="reg-row-actions">
-        <button type="button" className="btn-ghost" disabled title="Coming soon">
-          Edit
-        </button>
+        {deregisterable && (
+          <button type="button" className="btn-ghost" onClick={onEdit} disabled={inFlight}>
+            Edit
+          </button>
+        )}
         {deregisterable && (
           <button
             type="button"
             className={`btn-ghost reg-danger ${inFlight ? 'btn-loading' : ''}`}
-            disabled
-            title="Deregistration is temporarily disabled"
-            onClick={() => {
-              reset();
-              writeContract({
-                address: DIAMOND_ADDRESS,
-                abi: intentRegistryAbi,
-                functionName: 'deregisterEntity',
-                args: [BigInt(record.RegistrationID), ENTITY_MINER],
-              });
-            }}
+            disabled={inFlight}
+            onClick={handleDeregisterClick}
           >
-            {inFlight ? <><Spinner /> Deregistering…</> : 'Deregister'}
+            {inFlight ? <><Spinner /> Deregistering…</> : confirming ? 'Confirm Deregister?' : 'Deregister'}
           </button>
         )}
       </div>
@@ -181,7 +189,7 @@ function MinerRow({ record, onDeregistered }: {
   );
 }
 
-export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
+export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Props) {
   const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>('wasm');
   const { miners, wasm, isLoading, error, refetch } = useAddressRegistrations(address);
@@ -204,10 +212,7 @@ export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
 
         <div className="step-section-heading">
           <div className="step-eyebrow">YOUR REGISTRATIONS</div>
-          <h2 className="step-title">
-            Registrations
-            <Tip text="After your transaction confirms, it can take up to 5 minutes for the registry node to index it and show up here." />
-          </h2>
+          <h2 className="step-title">Registrations</h2>
           <p className="step-desc">
             {isConnected
               ? <>Everything registered on-chain by <span className="result-mono">{address}</span>, sourced live from the registry.</>
@@ -215,14 +220,55 @@ export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
           </p>
         </div>
 
-        <div className="sub-tabs sub-tabs-lg" style={{ marginBottom: '20px' }}>
-          <button type="button" className={`sub-tab sub-tab-lg ${tab === 'wasm' ? 'sub-tab-active' : ''}`} onClick={() => setTab('wasm')}>
-            WASM
-            {wasmRecords.length > 0 && <span className="sub-tab-count">{wasmRecords.length}</span>}
-          </button>
-          <button type="button" className={`sub-tab sub-tab-lg ${tab === 'yaml' ? 'sub-tab-active' : ''}`} onClick={() => setTab('yaml')}>
-            YAML
-            {yamlRecords.length > 0 && <span className="sub-tab-count">{yamlRecords.length}</span>}
+        <div className="reg-info-panel">
+          <div className="reg-info-title">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Indexing takes a few minutes
+          </div>
+          <p className="field-hint" style={{ margin: 0 }}>
+            After registering, deregistering, or editing a YAML entry, please wait 2-3 minutes for the change
+            to reflect here — that's the time the registry node's indexer needs to catch up.
+          </p>
+        </div>
+
+        <div className="reg-info-panel reg-info-panel-warn">
+          <div className="reg-info-title reg-info-title-warn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            Edit deregisters and re-registers
+          </div>
+          <p className="field-hint" style={{ margin: 0 }}>
+            Editing a YAML miner <strong>deregisters the current entry and registers a new one</strong> under
+            the hood — it'll appear here as a new registration ID, not an in-place update.
+          </p>
+        </div>
+
+        <div className="sub-tabs sub-tabs-lg" style={{ marginBottom: '20px', paddingBottom: '10px', justifyContent: 'space-between', alignItems: 'center', display: 'flex' }}>
+          <div style={{ display: 'flex' }}>
+            <button type="button" className={`sub-tab sub-tab-lg ${tab === 'wasm' ? 'sub-tab-active' : ''}`} onClick={() => setTab('wasm')}>
+              WASM
+              {wasmRecords.length > 0 && <span className="sub-tab-count">{wasmRecords.length}</span>}
+            </button>
+            <button type="button" className={`sub-tab sub-tab-lg ${tab === 'yaml' ? 'sub-tab-active' : ''}`} onClick={() => setTab('yaml')}>
+              YAML
+              {yamlRecords.length > 0 && <span className="sub-tab-count">{yamlRecords.length}</span>}
+            </button>
+          </div>
+          <button type="button" className="btn-ghost" onClick={refetch} disabled={isLoading}>
+            {isLoading ? <><Spinner /> Refreshing…</> : (
+              <>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <polyline points="23 4 23 10 17 10"/>
+                  <polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Refresh
+              </>
+            )}
           </button>
         </div>
 
@@ -263,7 +309,9 @@ export default function Dashboard({ onGoHome, onOpenProfile }: Props) {
           </div>
         ) : (
           <div className="reg-list">
-            {yamlRecords.map(r => <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} />)}
+            {yamlRecords.map(r => (
+              <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => onEditMiner(r)} />
+            ))}
           </div>
         )}
         </div>

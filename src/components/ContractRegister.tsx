@@ -10,23 +10,7 @@ import AuthModal from './AuthModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { useSession } from '../hooks/useSession';
-import { friendlyRevertMessage } from '../wasmAbi';
-
-const REGISTRY_ABI = [
-  {
-    name: 'registerMiner',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'yamlUrl',          type: 'string'   },
-      { name: 'yamlHash',         type: 'bytes32'  },
-      { name: 'feeAddress',       type: 'address'  },
-      { name: 'minPriceUsdc',     type: 'uint256'  },
-      { name: 'supportedIntents', type: 'string[]' },
-    ],
-    outputs: [],
-  },
-] as const;
+import { friendlyRevertMessage, intentRegistryAbi, type MinerRecordApi } from '../wasmAbi';
 
 const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? '') as `0x${string}`;
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
@@ -57,23 +41,27 @@ interface Props {
   intents: string[];
   minPriceUsdc: string;
   onBack: () => void;
+  /** When set, this form edits an existing registration (calls updateMiner) instead of creating a new one. */
+  editRecord?: MinerRecordApi;
 }
 
-export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack }: Props) {
+export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack, editRecord }: Props) {
+  const isEdit = !!editRecord;
   const toast = useToast();
   const { address, isConnected, chain } = useAccount();
   const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
   const [showAuth, setShowAuth] = useState(false);
 
-  const [mode, setMode] = useState<Mode>(pinataResult ? 'auto' : 'manual');
-  const [feeAddress, setFeeAddress]   = useState('');
-  const [minPrice, setMinPrice]       = useState(minPriceUsdc || '0.01');
+  // Editing only ever works from known existing values — there's no fresh YAML to auto-hash — so it's always 'manual'.
+  const [mode, setMode] = useState<Mode>(isEdit ? 'manual' : (pinataResult ? 'auto' : 'manual'));
+  const [feeAddress, setFeeAddress]   = useState(editRecord?.FeeAddress ?? '');
+  const [minPrice, setMinPrice]       = useState(editRecord ? (editRecord.MinPriceUsdc / 1_000_000).toString() : (minPriceUsdc || '0.01'));
   const [autoHash, setAutoHash]       = useState<`0x${string}` | ''>('');
 
   // manual-mode fields
-  const [manualHash, setManualHash]       = useState('');
-  const [manualUrl, setManualUrl]         = useState('');
-  const [manualIntents, setManualIntents] = useState(intents.join(', '));
+  const [manualHash, setManualHash]       = useState(editRecord?.YamlHash ?? '');
+  const [manualUrl, setManualUrl]         = useState(editRecord?.YamlURL ?? '');
+  const [manualIntents, setManualIntents] = useState(editRecord ? editRecord.SupportedIntents.join(', ') : intents.join(', '));
 
   const [showInfo, setShowInfo]         = useState(false);
   const [showHashModal, setShowHashModal] = useState(false);
@@ -123,7 +111,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
     if (isSuccess) {
       toastedTxRef.current = txHash;
-      toast.success('Miner registered on-chain successfully.');
+      toast.success(isEdit ? 'Miner updated on-chain successfully.' : 'Miner registered on-chain successfully.');
       if (address) {
         addYamlRegistration(address, {
           yamlUrl: effectiveUrl,
@@ -140,7 +128,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
       reset();
       toast.error('Transaction reverted on-chain. No changes were made — check BaseScan for details.');
     }
-  }, [isSuccess, isReverted, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents, reset]);
+  }, [isSuccess, isReverted, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents, reset, isEdit]);
 
   useEffect(() => {
     if (txError) toast.error(friendlyRevertMessage(txError.message ?? 'Transaction failed.'));
@@ -148,32 +136,53 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
   const handleRegister = () => {
     if (!canSubmit) return;
-    writeContract({
-      address: CONTRACT_ADDRESS,
-      abi: REGISTRY_ABI,
-      functionName: 'registerMiner',
-      args: [
-        effectiveUrl,
-        effectiveHash as `0x${string}`,
-        feeAddress as `0x${string}`,
-        priceRaw,
-        effectiveIntents,
-      ],
-    });
+    if (isEdit) {
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: intentRegistryAbi,
+        functionName: 'updateMiner',
+        args: [
+          BigInt(editRecord!.RegistrationID),
+          effectiveUrl,
+          effectiveHash as `0x${string}`,
+          feeAddress as `0x${string}`,
+          priceRaw,
+          effectiveIntents,
+        ],
+      });
+    } else {
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: intentRegistryAbi,
+        functionName: 'registerMiner',
+        args: [
+          effectiveUrl,
+          effectiveHash as `0x${string}`,
+          feeAddress as `0x${string}`,
+          priceRaw,
+          effectiveIntents,
+        ],
+      });
+    }
   };
 
   return (
     <div className="register-layout">
       {/* Header */}
       <div className="step-section-heading">
-        <div className="step-eyebrow">STEP 3 OF 3</div>
+        <div className="step-eyebrow">{isEdit ? 'EDIT REGISTRATION' : 'STEP 3 OF 3'}</div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <h2 className="step-title">Register On-Chain</h2>
+            <h2 className="step-title">{isEdit ? 'Edit Registration' : 'Register On-Chain'}</h2>
             <p className="step-desc">
-              Submit your miner to the Telegraph Diamond contract on Base Sepolia.
-              A unique <code className="inline-code">registrationId</code> will be issued and the node
-              will begin fetching your YAML at the next epoch boundary.
+              {isEdit ? (
+                <>Update your existing miner's YAML, fee address, floor price, or intents. This issues a new
+                  <code className="inline-code"> registrationId</code> under the hood — anything targeting the old one directly will need updating.</>
+              ) : (
+                <>Submit your miner to the Telegraph Diamond contract on Base Sepolia.
+                  A unique <code className="inline-code">registrationId</code> will be issued and the node
+                  will begin fetching your YAML at the next epoch boundary.</>
+              )}
             </p>
           </div>
           <button
@@ -203,29 +212,31 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
             <li>Once active, the miner is live in the routing engine with no restart needed.</li>
           </ol>
           <div className="reg-info-note">
-            <strong>Note:</strong> There is no update function. To change your YAML, fee address, or floor price, deregister the current entry and re-register with a new one.
-            &nbsp;<strong>minPriceUsdc is immutable per registration.</strong>
+            <strong>Note:</strong> To change your YAML, fee address, floor price, or intents later, use Edit from your Dashboard —
+            it issues a new registration ID under the hood, so anything targeting your old intent ID directly will need updating.
           </div>
         </div>
       )}
 
-      {/* Mode tabs */}
-      <div className="sub-tabs" style={{ marginBottom: '24px' }}>
-        <button type="button" className={`sub-tab ${mode === 'auto' ? 'sub-tab-active' : ''}`} onClick={() => setMode('auto')}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-          </svg>
-          Use uploaded YAML
-          {pinataResult && <span className="sub-tab-count">✓</span>}
-        </button>
-        <button type="button" className={`sub-tab ${mode === 'manual' ? 'sub-tab-active' : ''}`} onClick={() => setMode('manual')}>
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-          </svg>
-          Enter hash manually
-        </button>
-      </div>
+      {/* Mode tabs — editing always uses manual input against known existing values */}
+      {!isEdit && (
+        <div className="sub-tabs" style={{ marginBottom: '24px' }}>
+          <button type="button" className={`sub-tab ${mode === 'auto' ? 'sub-tab-active' : ''}`} onClick={() => setMode('auto')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+            Use uploaded YAML
+            {pinataResult && <span className="sub-tab-count">✓</span>}
+          </button>
+          <button type="button" className={`sub-tab ${mode === 'manual' ? 'sub-tab-active' : ''}`} onClick={() => setMode('manual')}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Enter hash manually
+          </button>
+        </div>
+      )}
 
       <div className="register-grid">
         {/* Wallet */}
@@ -276,7 +287,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               </div>
               {!sessionLoading && !user && (
                 <div className="wallet-disconnected" style={{ marginTop: 12 }}>
-                  <p className="wallet-disconnected-text">Sign in to register a miner.</p>
+                  <p className="wallet-disconnected-text">{isEdit ? 'Sign in to edit your registration.' : 'Sign in to register a miner.'}</p>
                   <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setShowAuth(true)}>
                     Login
                   </button>
@@ -407,7 +418,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               {feeError && feeAddress !== '' && <p className="field-error">{feeError}</p>}
             </div>
             <div className="field-group">
-              <label className="field-label">Floor Price (USDC) <span className="field-required">*</span><Tip text="Minimum $0.01. Stored as 6-decimal USDC on-chain (e.g. $0.01 = 10,000). Immutable per registration." /></label>
+              <label className="field-label">Floor Price (USDC) <span className="field-required">*</span><Tip text="Minimum $0.01. Stored as 6-decimal USDC on-chain (e.g. $0.01 = 10,000). Changeable later via Edit on your Dashboard." /></label>
               <input
                 className="field-input"
                 type="number"
@@ -484,7 +495,8 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   : !user           ? 'Sign In First'
                   : !CONTRACT_ADDRESS ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
-                  : txError         ? 'Retry Registration'
+                  : txError         ? (isEdit ? 'Retry Update' : 'Retry Registration')
+                  : isEdit          ? 'Update Miner'
                   : 'Register Miner'}
               </button>
             </>
@@ -528,10 +540,11 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 </svg>
               </div>
               <div className="tx-success-content">
-                <p className="tx-success-title">Miner Registered Successfully</p>
+                <p className="tx-success-title">{isEdit ? 'Miner Updated Successfully' : 'Miner Registered Successfully'}</p>
                 <p className="tx-success-sub">
-                  Your miner is staged as pending and will be activated at the next epoch boundary.
-                  No restart needed — Telegraph nodes will pick it up automatically.
+                  {isEdit
+                    ? "Your update is live under a new registration ID — check your Dashboard in a couple minutes for the new entry."
+                    : 'Your miner is staged as pending and will be activated at the next epoch boundary. No restart needed — Telegraph nodes will pick it up automatically.'}
                 </p>
                 <div className="tx-hash-row">
                   <span className="result-row-label">TX HASH</span>

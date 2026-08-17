@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
 type ToastVariant = 'success' | 'error' | 'info';
 
@@ -56,12 +56,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setTimeout(() => dismiss(id), 5000);
   }, [dismiss]);
 
-  const value: ToastContextValue = {
-    push,
-    success: (message: string) => push(message, 'success'),
-    error: (message: string) => push(message, 'error'),
-    info: (message: string) => push(message, 'info'),
-  };
+  const success = useCallback((message: string) => push(message, 'success'), [push]);
+  const error = useCallback((message: string) => push(message, 'error'), [push]);
+  const info = useCallback((message: string) => push(message, 'info'), [push]);
+
+  const value: ToastContextValue = useMemo(
+    () => ({ push, success, error, info }),
+    [push, success, error, info],
+  );
 
   return (
     <ToastContext.Provider value={value}>

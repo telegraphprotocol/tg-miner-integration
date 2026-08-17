@@ -148,9 +148,11 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
               <h1 className="lv2-hero-headline">
                 Get your API discovered, ranked, and <span className="lv2-hero-accent">paid</span> — automatically.
               </h1>
+              <div className="lv2-hero-prize-badge">$15,000 Hackathon Prize Pool</div>
               <p className="lv2-hero-sub">
                 Hook up your API in minutes. Compete on a live leaderboard, win requests from autonomous
-                agents, and get paid per call — no sales calls, no negotiating.
+                agents, and get paid per call — no sales calls, no negotiating. Registering here
+                automatically enters you into the Telegraph Hackathon.
               </p>
               {!user && (
                 <button
@@ -211,7 +213,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
               </div>
             </div>
 
-            <LiveLeaderboard limit={6} className="lv2-leaderboard" onGetRanked={() => { emitIntentSignal(); rootHandlers.yaml(); }} />
+            <LiveLeaderboard limit={3} className="lv2-leaderboard" onGetRanked={() => { emitIntentSignal(); rootHandlers.yaml(); }} />
           </>
         )}
 

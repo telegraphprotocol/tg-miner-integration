@@ -98,6 +98,14 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
           </div>
         )}
         <div className="lb-panel-actions">
+          <a
+            className="io-btn"
+            href="https://explorer.telegraphprotocol.com/miners/leaderboard"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            See Full Ranking →
+          </a>
           <button
             type="button"
             className="io-btn io-btn-accent"
