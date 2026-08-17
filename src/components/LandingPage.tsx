@@ -152,23 +152,21 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
                 Hook up your API in minutes. Compete on a live leaderboard, win requests from autonomous
                 agents, and get paid per call — no sales calls, no negotiating.
               </p>
-              <button
-                type="button"
-                className="lv2-hero-cta-primary"
-                onClick={() => {
-                  emitIntentSignal();
-                  if (user) {
-                    setChoice('yaml');
-                  } else {
+              {!user && (
+                <button
+                  type="button"
+                  className="lv2-hero-cta-primary"
+                  onClick={() => {
+                    emitIntentSignal();
                     // AccountButton (and the modal it opens) lives inside the mobile hamburger
                     // panel — it's off-screen until that panel itself is open.
                     setMenuOpen(true);
                     emitOpenAuthSignal('signup');
-                  }
-                }}
-              >
-                Register Now →
-              </button>
+                  }}
+                >
+                  Register Now →
+                </button>
+              )}
             </div>
 
             <div className="lv2-cards-block" id="root-cards">
