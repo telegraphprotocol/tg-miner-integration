@@ -64,8 +64,9 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
         body: JSON.stringify({ yaml, api_key: requiresApiKey ? apiKey.trim() : '' }),
       });
       if (!vRes.ok && vRes.status !== 200) {
-        const vErr = await vRes.json().catch(() => ({}));
-        throw new Error(vErr.error ?? `Validation request failed (${vRes.status})`);
+        const vErr = await vRes.json().catch(() => null);
+        const detail = vErr?.error ?? vErr?.message ?? (vErr ? JSON.stringify(vErr) : null);
+        throw new Error(detail ?? `Validation request failed (${vRes.status}) — no error detail returned.`);
       }
       const vData = await vRes.json() as ValidationResponse;
       setValidationResults(vData.results ?? null);
@@ -187,14 +188,34 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
             </div>
           )}
 
-          {errorMsg && <p className="field-error" style={{ marginBottom: '16px' }}>{errorMsg}</p>}
+          {errorMsg && (
+            <div className="reg-info-panel reg-info-panel-error" style={{ marginBottom: '16px' }}>
+              <div className="reg-info-title reg-info-title-error">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Request Failed
+              </div>
+              <p className="field-hint" style={{ margin: 0, color: 'rgba(255,255,255,0.7)' }}>{errorMsg}</p>
+            </div>
+          )}
 
           {validationErrors.length > 0 && (
-            <div className="field-error" style={{ marginBottom: '16px' }}>
-              <strong>Validation failed:</strong>
-              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+            <div className="reg-info-panel reg-info-panel-error" style={{ marginBottom: '16px' }}>
+              <div className="reg-info-title reg-info-title-error">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Validation Failed
+              </div>
+              <ul className="reg-info-list reg-info-list-error" style={{ paddingLeft: '16px' }}>
                 {validationErrors.map((e, i) => <li key={i}>{e}</li>)}
               </ul>
+              {!requiresApiKey && validationErrors.some(e => /api_key|api key/i.test(e)) && (
+                <p className="field-hint" style={{ margin: 0, color: 'rgba(255,200,80,0.75)' }}>
+                  This endpoint needs a credential — switch on <strong>Requires API Key</strong> above and paste one in.
+                </p>
+              )}
             </div>
           )}
 

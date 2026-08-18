@@ -26,6 +26,20 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({ yaml, api_key: api_key ?? '' }),
   });
 
-  const data = await upstream.json();
+  const rawText = await upstream.text();
+  if (!upstream.ok) {
+    console.error(`[api/validate] upstream ${upstream.status}:`, rawText);
+  }
+
+  let data: unknown;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    return NextResponse.json(
+      { error: rawText || `Validator returned a non-JSON ${upstream.status} response.` },
+      { status: upstream.status },
+    );
+  }
+
   return NextResponse.json(data, { status: upstream.status });
 }

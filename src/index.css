@@ -4298,6 +4298,19 @@ body::before {
   color: rgba(255,200,80,0.85);
 }
 
+.reg-info-panel-error {
+  background: rgba(255,100,100,0.05);
+  border-color: rgba(255,100,100,0.2);
+}
+
+.reg-info-title-error {
+  color: var(--error);
+}
+
+.reg-info-list-error li {
+  color: rgba(255,255,255,0.7);
+}
+
 .reg-info-list {
   display: flex;
   flex-direction: column;

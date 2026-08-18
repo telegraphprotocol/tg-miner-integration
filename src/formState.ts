@@ -14,7 +14,7 @@ export const DEFAULT_FORM: FormState = {
   circuit_threshold: '',
   circuit_cooldown_seconds: '',
 
-  auth_type: 'bearer',
+  auth_type: 'none',
   auth_env_var: '',
   auth_header_name: '',
   auth_value_prefix: '',

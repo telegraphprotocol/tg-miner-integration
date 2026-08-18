@@ -130,7 +130,7 @@ export function parseYamlToForm(yamlStr: string): FormState {
     circuit_threshold: doc.circuit_threshold != null ? str(doc.circuit_threshold) : '',
     circuit_cooldown_seconds: doc.circuit_cooldown_seconds != null ? str(doc.circuit_cooldown_seconds) : '',
 
-    auth_type: str(auth.type) || 'bearer',
+    auth_type: str(auth.type) || 'none',
     auth_env_var: str(auth.env_var),
     auth_header_name: str(auth.header_name),
     auth_value_prefix: str(auth.value_prefix),
