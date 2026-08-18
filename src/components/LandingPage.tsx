@@ -51,7 +51,7 @@ const ROOT_CARDS = [
   {
     key: 'yaml',
     title: 'Connect API',
-    desc: 'Hook your API in 2 minutes. Get ranked, race to the top of the leaderboard, and compete to win paid requests directly from machines & agents.',
+    desc: 'Hook your API in 2 minutes. Get scored, climb the leaderboard, and compete to win paid requests directly from machines & agents.',
     cta: 'Continue →',
     tags: ['API', 'Available now'],
     gated: false,
@@ -59,7 +59,7 @@ const ROOT_CARDS = [
   {
     key: 'wasm',
     title: 'Submit WASM',
-    desc: 'Write evaluation scripts. Build the logic that ranks APIs, and earn recurring revenue every time your script runs.',
+    desc: 'Write evaluation scripts. Build the logic that scores APIs, and earn recurring revenue every time your script runs.',
     cta: 'Continue →',
     tags: ['WASM', 'Available now'],
     gated: false,
@@ -67,7 +67,7 @@ const ROOT_CARDS = [
   {
     key: 'integrate',
     title: 'Consume Intelligence',
-    desc: 'Power your agents with ranked intelligence. Drop in our 1-line SDK to automatically route requests to the top ranked providers.',
+    desc: 'Power your agents with scored intelligence. Drop in our 1-line SDK to automatically route requests to the top-scoring providers.',
     cta: 'Explore →',
     tags: ['MCP · WebSocket', 'SDK'],
     gated: false,
@@ -146,7 +146,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
           <>
             <div className="lv2-hero-copy">
               <h1 className="lv2-hero-headline">
-                Get your API discovered, ranked, and <span className="lv2-hero-accent">paid</span> — automatically.
+                Get your API discovered, scored, and <span className="lv2-hero-accent">paid</span> — automatically.
               </h1>
               <div className="lv2-hero-prize-badge">$15,000 Hackathon Prize Pool</div>
               <p className="lv2-hero-sub">

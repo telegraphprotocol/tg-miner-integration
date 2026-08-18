@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import '../src/index.css';
 import Providers from '../src/providers';
 
 export const metadata: Metadata = {
   title: 'Telegraph · Developer Console',
-  description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by ranked intelligence.',
+  description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by scored intelligence.',
   metadataBase: new URL('https://integrate.telegraphprotocol.com'),
   icons: { icon: '/logo.png' },
   openGraph: {
     title: 'Telegraph · Developer Console',
-    description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by ranked intelligence.',
+    description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by scored intelligence.',
     url: 'https://integrate.telegraphprotocol.com',
     siteName: 'Telegraph Developer Console',
     images: [
@@ -25,7 +26,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Telegraph · Developer Console',
-    description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by ranked intelligence.',
+    description: 'Monetize your APIs, write evaluation scripts, and build autonomous agents powered by scored intelligence.',
     images: ['/telegraph-social-card.jpg'],
   },
 };
@@ -46,6 +47,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body suppressHydrationWarning>
+        {/* X (Twitter) conversion tracking base pixel — event fired on successful signup, see src/lib/xPixel.ts */}
+        <Script id="x-pixel-base" strategy="afterInteractive">
+          {`!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
+},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
+a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+twq('config','rcv9y');`}
+        </Script>
         <Providers>{children}</Providers>
       </body>
     </html>

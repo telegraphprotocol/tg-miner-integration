@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordRules';
+import { fireSignupConversion } from '../lib/xPixel';
 
 interface Props {
   onClose: () => void;
@@ -111,6 +112,7 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
       const data = await res.json();
       if (!res.ok) { setSignupError(data.error || 'Could not verify code.'); return; }
       toast.success('Account created.');
+      fireSignupConversion();
       onAuthed();
     } catch {
       setSignupError('Network error. Please try again.');

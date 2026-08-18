@@ -74,7 +74,7 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
           <span className="lb-panel-title">Live Leaderboard</span>
         </div>
         <p className="lb-panel-sub">
-          Top-ranked APIs win the most requests every day — integrate and climb the ranks.
+          Top-scoring APIs win the most requests every day — integrate and climb the leaderboard.
         </p>
       </div>
 
@@ -104,14 +104,14 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
             target="_blank"
             rel="noopener noreferrer"
           >
-            See Full Ranking →
+            See Full Leaderboard →
           </a>
           <button
             type="button"
             className="io-btn io-btn-accent"
             onClick={() => onGetRanked ? onGetRanked() : document.getElementById('root-cards')?.scrollIntoView({ behavior: 'smooth' })}
           >
-            Get Ranked →
+            Get Scored →
           </button>
         </div>
       </div>
@@ -133,7 +133,7 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
             </colgroup>
             <thead>
               <tr>
-                <th className="lb-col-rank">Rank</th>
+                <th className="lb-col-rank">#</th>
                 <th>API</th>
                 <th>Status</th>
                 <th className="lb-col-num">Score</th>
