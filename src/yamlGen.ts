@@ -1,4 +1,4 @@
-import type { FormState, OnChainFieldItem, OnChainRequestItem, LimitationItem } from './types';
+import type { FormState, OnChainFieldItem, OnChainRequestItem, LimitationItem, AuthInjectItem } from './types';
 import { schemaFieldsToJson } from './schemaUtils';
 
 const i2 = (s: string) => s.split('\n').map(l => `  ${l}`).join('\n');
@@ -22,9 +22,21 @@ function renderLimitations(items: LimitationItem[]): string {
     if (l.value_bytes) block += `    value_bytes: ${l.value_bytes}\n`;
     if (l.value_num) block += `    value_num: ${l.value_num}\n`;
     if (l.operator) block += `    operator: ${l.operator}\n`;
+    if (l.window_seconds) block += `    window_seconds: ${l.window_seconds}\n`;
     return block;
   });
   return `limitations:\n${rows.join('')}`;
+}
+
+function renderAuthInject(items: AuthInjectItem[]): string {
+  const rows = items.map(i => {
+    let block = `    - in: ${i.in}\n`;
+    block += `      name: ${i.name}\n`;
+    if (i.secret) block += `      secret: ${i.secret}\n`;
+    if (i.value_prefix) block += `      value_prefix: ${i.value_prefix}\n`;
+    return block;
+  });
+  return `  inject:\n${rows.join('')}`;
 }
 
 function renderOnChainFields(items: OnChainFieldItem[], type: string): string {
@@ -115,16 +127,31 @@ export function generateYaml(s: FormState): string {
   }
 
   // Auth
+  const validInjects = s.auth_inject.filter(i => i.in && i.name);
   if (s.auth_type && s.auth_type !== 'none') {
     lines.push(`auth:`);
     lines.push(`  type: ${s.auth_type}`);
     if (s.auth_env_var) lines.push(`  env_var: ${s.auth_env_var}`);
     if (s.auth_header_name) lines.push(`  header_name: ${s.auth_header_name}`);
     if (s.auth_value_prefix) lines.push(`  value_prefix: ${s.auth_value_prefix}`);
+    if (validInjects.length) lines.push(renderAuthInject(validInjects).trimEnd());
     lines.push('');
   } else if (s.auth_type === 'none') {
     lines.push(`auth:`);
     lines.push(`  type: none`);
+    if (validInjects.length) lines.push(renderAuthInject(validInjects).trimEnd());
+    lines.push('');
+  }
+
+  // Errors
+  const hasErrors = s.errors_message_path || s.errors_code_path || s.errors_status_path || s.errors_success_values.trim();
+  if (hasErrors) {
+    lines.push(`errors:`);
+    if (s.errors_message_path) lines.push(`  message_path: ${s.errors_message_path}`);
+    if (s.errors_code_path) lines.push(`  code_path: ${s.errors_code_path}`);
+    if (s.errors_status_path) lines.push(`  status_path: ${s.errors_status_path}`);
+    const successValues = s.errors_success_values.split(',').map(v => v.trim()).filter(Boolean);
+    if (successValues.length) lines.push(`  success_values: [${successValues.map(v => `"${v}"`).join(', ')}]`);
     lines.push('');
   }
 

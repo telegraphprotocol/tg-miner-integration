@@ -183,6 +183,7 @@ export interface MinerRecordApi {
   FeeAddress: string;
   MinPriceUsdc: number;
   SupportedIntents: string[];
+  RejectionReason: string | null;
   RegisteredAt: string;
   UpdatedAt: string;
 }

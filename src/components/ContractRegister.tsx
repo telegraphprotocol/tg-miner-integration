@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from 'react';
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
+import { decodeEventLog } from 'viem';
 import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
 import AuthModal from './AuthModal';
+import Spinner from './Spinner';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { useSession } from '../hooks/useSession';
@@ -130,6 +132,61 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
     }
   }, [isSuccess, isReverted, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents, reset, isEdit]);
 
+  // ── Live status polling — decode registrationId from the receipt's MinerRegistered
+  // event so the success screen shows real activation status instead of waiting
+  // 2-3 minutes for the address-bundle indexer used elsewhere in the app. ──
+  const [freshRegistrationId, setFreshRegistrationId] = useState<string | null>(null);
+  const [liveStatus, setLiveStatus] = useState<{ activationStatus: string; rejectionReason: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!isSuccess || !receipt) return;
+    for (const log of receipt.logs) {
+      try {
+        const decoded = decodeEventLog({ abi: intentRegistryAbi, data: log.data, topics: log.topics, eventName: 'MinerRegistered' });
+        setFreshRegistrationId(decoded.args.registrationId.toString());
+        return;
+      } catch {
+        // not this log — try the next one
+      }
+    }
+  }, [isSuccess, receipt]);
+
+  const TERMINAL_STATUSES = ['active', 'rejected', 'superseded', 'deregistered'];
+  const MAX_POLL_ATTEMPTS = 20; // ~80s at 4s intervals before giving up with a visible error
+  const [statusPollError, setStatusPollError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!freshRegistrationId) return;
+    let cancelled = false;
+    let attempts = 0;
+    let interval: ReturnType<typeof setInterval>;
+
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await fetch(`/api/registrations/by-id/${freshRegistrationId}`);
+        if (cancelled) return;
+        if (!res.ok) throw new Error(`Registry returned HTTP ${res.status}`);
+        const data = await res.json();
+        const miner = data.miner ?? data;
+        const next = { activationStatus: miner.ActivationStatus, rejectionReason: miner.RejectionReason ?? null };
+        setStatusPollError(null);
+        setLiveStatus(next);
+        if (TERMINAL_STATUSES.includes(next.activationStatus)) clearInterval(interval);
+      } catch (err) {
+        if (cancelled) return;
+        if (attempts >= MAX_POLL_ATTEMPTS) {
+          setStatusPollError((err as Error).message || 'Could not reach the registry node.');
+          clearInterval(interval);
+        }
+      }
+    };
+
+    poll();
+    interval = setInterval(poll, 4000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [freshRegistrationId]);
+
   useEffect(() => {
     if (txError) toast.error(friendlyRevertMessage(txError.message ?? 'Transaction failed.'));
   }, [txError, toast]);
@@ -180,8 +237,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   <code className="inline-code"> registrationId</code> under the hood — anything targeting the old one directly will need updating.</>
               ) : (
                 <>Submit your miner to the Telegraph Diamond contract on Base Sepolia.
-                  A unique <code className="inline-code">registrationId</code> will be issued and the node
-                  will begin fetching your YAML at the next epoch boundary.</>
+                  A unique <code className="inline-code">registrationId</code> will be issued and nodes
+                  will fetch your YAML within about a minute of the on-chain event — there's no epoch
+                  boundary to wait for.</>
               )}
             </p>
           </div>
@@ -208,7 +266,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
           <ol className="reg-info-list">
             <li>Your YAML URL, SHA-256 hash, intents, fee address, and floor price are stored on-chain — a unique <code className="inline-code">registrationId</code> is issued.</li>
             <li>Telegraph nodes detect the event, fetch the YAML from the declared URL, and verify its SHA-256 hash matches the on-chain commitment.</li>
-            <li>If valid, the YAML is staged as <em>pending</em> and activated at the next epoch boundary.</li>
+            <li>If valid, the YAML is staged as <em>pending</em> and activated within about a minute — activation is driven by the registration event, not an epoch schedule.</li>
             <li>Once active, the miner is live in the routing engine with no restart needed.</li>
           </ol>
           <div className="reg-info-note">
@@ -544,7 +602,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 <p className="tx-success-sub">
                   {isEdit
                     ? "Your update is live under a new registration ID — check your Dashboard in a couple minutes for the new entry."
-                    : 'Your miner is staged as pending and will be activated at the next epoch boundary. No restart needed — Telegraph nodes will pick it up automatically.'}
+                    : 'Your miner is staged as pending and will activate within about a minute — activation is driven by the registration event, not an epoch schedule. No restart needed.'}
                 </p>
                 <div className="tx-hash-row">
                   <span className="result-row-label">TX HASH</span>
@@ -562,6 +620,43 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                     </svg>
                   </a>
                 </div>
+
+                {freshRegistrationId && (
+                  <div className="wallet-info" style={{ marginTop: 12 }}>
+                    <div className="wallet-info-row">
+                      <span className="result-row-label">REGISTRATION ID</span>
+                      <span className="result-row-value result-mono">{freshRegistrationId}</span>
+                    </div>
+                    <div className="wallet-info-row">
+                      <span className="result-row-label">LIVE STATUS</span>
+                      <span className="result-row-value">
+                        {liveStatus
+                          ? <span className={`reg-status-badge ${liveStatus.activationStatus === 'active' ? 'badge-success' : liveStatus.activationStatus === 'rejected' ? 'wasm-status-bad' : 'wasm-status-pending'}`}>
+                              {String(liveStatus.activationStatus ?? 'unknown').toUpperCase()}
+                            </span>
+                          : statusPollError
+                            ? <span className="reg-status-badge wasm-status-bad">UNAVAILABLE</span>
+                            : <><Spinner /> checking…</>}
+                      </span>
+                    </div>
+                    {statusPollError && !liveStatus && (
+                      <p className="field-hint" style={{ marginTop: 6 }}>
+                        Couldn't reach the registry node ({statusPollError}) — your registration was still
+                        confirmed on-chain. Check your Dashboard in a couple minutes instead.
+                      </p>
+                    )}
+                    {liveStatus?.rejectionReason && (
+                      <>
+                        <p className="field-error" style={{ marginTop: 6 }}>{liveStatus.rejectionReason}</p>
+                        {liveStatus.activationStatus === 'rejected' && (
+                          <p className="field-hint" style={{ marginTop: 2 }}>
+                            This slug is now free — fix the issue and re-submit (Edit) promptly.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}

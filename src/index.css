@@ -780,7 +780,7 @@ body::before {
 ══════════════════════════════════════════════ */
 .toast-stack {
   position: fixed;
-  top: 20px;
+  top: calc(64px + 20px);
   right: 20px;
   z-index: 1000;
   display: flex;
@@ -824,6 +824,8 @@ body::before {
 .toast-error .toast-icon { color: var(--error); }
 .toast-info { border-color: var(--border-strong); }
 .toast-info .toast-icon { color: var(--muted); }
+.toast-warning { border-color: rgba(255, 200, 80, 0.35); }
+.toast-warning .toast-icon { color: rgba(255, 200, 80, 0.9); }
 
 .toast-message {
   flex: 1;
@@ -3643,6 +3645,13 @@ body::before {
 .modal-auth {
   width: 100%;
   max-width: 400px;
+  padding: 24px;
+  gap: 16px;
+}
+
+.modal-md {
+  width: 100%;
+  max-width: 480px;
   padding: 24px;
   gap: 16px;
 }

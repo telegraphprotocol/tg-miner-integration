@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 
-type ToastVariant = 'success' | 'error' | 'info';
+type ToastVariant = 'success' | 'error' | 'info' | 'warning';
 
 interface ToastItem {
   id: number;
@@ -15,6 +15,7 @@ interface ToastContextValue {
   success: (message: string) => void;
   error: (message: string) => void;
   info: (message: string) => void;
+  warning: (message: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -40,6 +41,12 @@ const ICONS: Record<ToastVariant, ReactNode> = {
       <line x1="12" y1="8" x2="12.01" y2="8" />
     </svg>
   ),
+  warning: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+  ),
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -59,10 +66,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const success = useCallback((message: string) => push(message, 'success'), [push]);
   const error = useCallback((message: string) => push(message, 'error'), [push]);
   const info = useCallback((message: string) => push(message, 'info'), [push]);
+  const warning = useCallback((message: string) => push(message, 'warning'), [push]);
 
   const value: ToastContextValue = useMemo(
-    () => ({ push, success, error, info }),
-    [push, success, error, info],
+    () => ({ push, success, error, info, warning }),
+    [push, success, error, info, warning],
   );
 
   return (

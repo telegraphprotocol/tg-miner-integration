@@ -38,6 +38,7 @@ function AppInner() {
 
   const handleImport = (imported: FormState) => {
     setForm(imported);
+    setPinataResult(null); // a newly imported YAML needs its own validate/upload, not a stale one
     setShowImport(false);
     setStep(importTarget);
     setView('app');

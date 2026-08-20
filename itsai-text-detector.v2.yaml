@@ -26,7 +26,8 @@ limitations:
 auth:
   type: header
   header_name: Authorization
-  env_var: SUBNET_32_API_KEY
+  # env_var is not read by the node — install the real key after registering,
+  # via Dashboard -> API Key (wallet-signed, POST /miner-dispatcher/miners/{slug}/api-key).
 
 rate_limit_per_sec: 10
 cache_ttl_sec: 60
@@ -45,7 +46,7 @@ semantics:
     label_field: answer
     reason_field: status
   supported_intents:
-    - AI_DETECTION
+    - AI_TEXT_DETECTION
 
 on_chain:
   transform: direct

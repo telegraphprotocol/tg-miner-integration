@@ -54,7 +54,7 @@ export default function YamlHashModal({ onApply, onClose }: Props) {
 
   return (
     <div className="modal-bd" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-panel" style={{ maxWidth: 480 }}>
+      <div className="modal-panel modal-md">
         <div className="modal-header">
           <div className="modal-header-left">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">

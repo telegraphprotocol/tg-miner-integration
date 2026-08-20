@@ -18,6 +18,12 @@ export const DEFAULT_FORM: FormState = {
   auth_env_var: '',
   auth_header_name: '',
   auth_value_prefix: '',
+  auth_inject: [],
+
+  errors_message_path: '',
+  errors_code_path: '',
+  errors_status_path: '',
+  errors_success_values: '',
 
   docs_website: '',
   docs_documentation: '',

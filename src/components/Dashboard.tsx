@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
 import Header from './Header';
 import Spinner from './Spinner';
+import ApiKeyModal from './ApiKeyModal';
 import { useToast } from './Toast';
 import { useAddressRegistrations } from '../hooks/useAddressRegistrations';
 import {
@@ -107,6 +108,8 @@ function MinerRow({ record, onDeregistered, onEdit }: {
 }) {
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -136,6 +139,27 @@ function MinerRow({ record, onDeregistered, onEdit }: {
   const status = record.ActivationStatus;
   const inFlight = isPending || isConfirming;
   const deregisterable = status !== 'deregistered';
+  const keyInstallable = ['active', 'pending', 'unreachable'].includes(status);
+
+  const handleCheckStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const res = await fetch(`/api/registrations/by-id/${record.RegistrationID}`);
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Could not reach the registry node.'); return; }
+      const miner = data.miner ?? data;
+      const reason = miner.RejectionReason ? ` — ${miner.RejectionReason}` : '';
+      const msg = `Registration #${record.RegistrationID}: ${String(miner.ActivationStatus).toUpperCase()}${reason}`;
+      // Mirrors statusBadgeClass() below: active=green, rejected/deregistered=red, else=yellow.
+      if (miner.ActivationStatus === 'active') toast.success(msg);
+      else if (miner.ActivationStatus === 'rejected' || miner.ActivationStatus === 'deregistered') toast.error(msg);
+      else toast.warning(msg); // pending / unreachable / superseded
+    } catch {
+      toast.error('Network error checking status.');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
 
   const handleDeregisterClick = () => {
     if (!confirming) { setConfirming(true); return; }
@@ -167,8 +191,26 @@ function MinerRow({ record, onDeregistered, onEdit }: {
           <span className="reg-row-sep">·</span>
           <span>{new Date(record.RegisteredAt).toLocaleString()}</span>
         </div>
+        {record.RejectionReason && (
+          <>
+            <p className="field-error" style={{ marginTop: 6 }}>{record.RejectionReason}</p>
+            {status === 'rejected' && (
+              <p className="field-hint" style={{ marginTop: 2 }}>
+                This slug is now free — fix the issue and re-submit (Edit) promptly.
+              </p>
+            )}
+          </>
+        )}
       </div>
       <div className="reg-row-actions">
+        <button type="button" className="btn-ghost" onClick={handleCheckStatus} disabled={inFlight || checkingStatus}>
+          {checkingStatus ? <><Spinner /> Checking…</> : 'Check Status'}
+        </button>
+        {keyInstallable && (
+          <button type="button" className="btn-ghost" onClick={() => setShowApiKeyModal(true)} disabled={inFlight}>
+            API Key
+          </button>
+        )}
         {deregisterable && (
           <button type="button" className="btn-ghost" onClick={onEdit} disabled={inFlight}>
             Edit
@@ -185,6 +227,9 @@ function MinerRow({ record, onDeregistered, onEdit }: {
           </button>
         )}
       </div>
+      {showApiKeyModal && (
+        <ApiKeyModal slug={record.Slug} onClose={() => setShowApiKeyModal(false)} />
+      )}
     </div>
   );
 }

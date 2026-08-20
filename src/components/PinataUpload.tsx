@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { PinataResult } from '../types';
 import YamlPreview from './YamlPreview';
 import { useToast } from './Toast';
@@ -43,6 +43,12 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[] | null>(null);
   const [apiKeyStored, setApiKeyStored] = useState(false);
+
+  // result is owned by the parent and can be cleared out from under us (e.g. a fresh
+  // YAML import) without this component remounting — re-sync instead of only seeding at mount.
+  useEffect(() => {
+    if (!result) setState('idle');
+  }, [result]);
 
   const handleUpload = async () => {
     if (requiresApiKey && !apiKey.trim()) {
@@ -124,7 +130,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
           <h2 className="step-title">Validate &amp; Upload to IPFS</h2>
           <p className="step-desc">
             {requiresApiKey
-              ? 'Your API key is sandbox-tested against every endpoint before pinning. On success, it is stored in the node database so your miner goes live automatically after on-chain registration.'
+              ? "Your API key is sandbox-tested against every endpoint before pinning. It's only stored in the node database if this slug already has a live registration — otherwise, install it from your Dashboard after you register."
               : 'Your endpoints are sandbox-tested before pinning — no API key needed for keyless miners.'}
           </p>
         </div>
@@ -232,6 +238,12 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
                   </span>
                 )}
               </div>
+              {requiresApiKey && !apiKeyStored && (
+                <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
+                  Key was tested but not stored — this slug isn't registered on-chain yet.
+                  Install it from your Dashboard once registration is confirmed.
+                </p>
+              )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {validationResults.map((r, i) => (
                   <div key={i} style={{

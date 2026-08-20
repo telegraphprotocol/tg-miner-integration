@@ -7,7 +7,7 @@ import { schemaFieldsToJson, schemaJsonToFields } from '../../schemaUtils';
 import { uid } from '../../formState';
 
 const MACHINE_CODES = ['MAX_BODY_SIZE', 'MAX_PARAM_SIZE', 'MAX_PARAM_VALUE', 'MAX_PARAM_COUNT'];
-const PROPERTIES = ['size_bytes', 'value', 'length', 'count'];
+const PROPERTIES = ['size_bytes', 'value', 'length', 'count', 'rate'];
 const OPERATORS = ['lte', 'gte', 'lt', 'gt', 'eq'];
 
 function TrashIcon() {
@@ -18,7 +18,7 @@ function PlusIcon() {
 }
 
 function LimitationsEditor({ items, onChange }: { items: LimitationItem[]; onChange: (v: LimitationItem[]) => void }) {
-  const add = () => onChange([...items, { _id: uid(), code: '', message: '', param: '', property: '', value_bytes: '', value_num: '', operator: '' }]);
+  const add = () => onChange([...items, { _id: uid(), code: '', message: '', param: '', property: '', value_bytes: '', value_num: '', operator: '', window_seconds: '' }]);
   const update = (id: string, patch: Partial<LimitationItem>) => onChange(items.map(l => l._id === id ? { ...l, ...patch } : l));
   const remove = (id: string) => onChange(items.filter(l => l._id !== id));
 
@@ -105,6 +105,20 @@ function LimitationsEditor({ items, onChange }: { items: LimitationItem[]; onCha
                 onChange={e => update(l._id, { value_num: e.target.value })}
               />
             </div>
+            {l.property === 'rate' && (
+              <div className="field-group">
+                <label className="field-label">Window (seconds)</label>
+                <input
+                  className="field-input"
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 2592000 for 30 days"
+                  value={l.window_seconds}
+                  onChange={e => update(l._id, { window_seconds: e.target.value })}
+                />
+                <p className="field-hint">The window value_num applies over — e.g. 100 requests per 2592000s (30 days).</p>
+              </div>
+            )}
           </div>
         </div>
       ))}

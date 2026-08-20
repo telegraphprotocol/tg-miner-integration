@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import type { FormState, EndpointItem, OnChainFieldItem, OnChainRequestItem, OnChainBodyField, LimitationItem } from './types';
+import type { FormState, EndpointItem, OnChainFieldItem, OnChainRequestItem, OnChainBodyField, LimitationItem, AuthInjectItem } from './types';
 import { DEFAULT_FORM, uid } from './formState';
 import { schemaJsonToFields } from './schemaUtils';
 
@@ -31,6 +31,18 @@ function parseLimitations(arr: unknown): LimitationItem[] {
     value_bytes: item.value_bytes != null ? str(item.value_bytes) : '',
     value_num: item.value_num != null ? str(item.value_num) : '',
     operator: str(item.operator),
+    window_seconds: item.window_seconds != null ? str(item.window_seconds) : '',
+  }));
+}
+
+function parseAuthInject(arr: unknown): AuthInjectItem[] {
+  if (!Array.isArray(arr)) return [];
+  return arr.map((item: Record<string, unknown>) => ({
+    _id: uid(),
+    in: str(item.in),
+    name: str(item.name),
+    secret: str(item.secret),
+    value_prefix: str(item.value_prefix),
   }));
 }
 
@@ -59,6 +71,7 @@ export function parseYamlToForm(yamlStr: string): FormState {
   }
 
   const auth = (doc.auth ?? {}) as Record<string, unknown>;
+  const errorsBlock = (doc.errors ?? {}) as Record<string, unknown>;
   const polling = (doc.polling ?? {}) as Record<string, unknown>;
   const docsBlock = (doc.docs ?? {}) as Record<string, unknown>;
   const semantics = (doc.semantics ?? {}) as Record<string, unknown>;
@@ -134,6 +147,14 @@ export function parseYamlToForm(yamlStr: string): FormState {
     auth_env_var: str(auth.env_var),
     auth_header_name: str(auth.header_name),
     auth_value_prefix: str(auth.value_prefix),
+    auth_inject: parseAuthInject(auth.inject),
+
+    errors_message_path: str(errorsBlock.message_path),
+    errors_code_path: str(errorsBlock.code_path),
+    errors_status_path: str(errorsBlock.status_path),
+    errors_success_values: Array.isArray(errorsBlock.success_values)
+      ? (errorsBlock.success_values as unknown[]).map(str).join(', ')
+      : '',
 
     docs_website: str(docsBlock.website),
     docs_documentation: str(docsBlock.documentation),

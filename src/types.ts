@@ -72,7 +72,18 @@ export interface LimitationItem {
   value_bytes: string;
   value_num: string;
   operator: string;
+  /** Only meaningful for property: rate — the window value_num applies over, in seconds. */
+  window_seconds: string;
   autoConfigured?: boolean;
+}
+
+export interface AuthInjectItem {
+  _id: string;
+  in: string; // 'header' | 'query' | 'body' | 'multipart'
+  name: string;
+  /** Selects one value from a multi-secret JSON key (e.g. api_key, api_secret). Omit for single-secret providers. */
+  secret: string;
+  value_prefix: string;
 }
 
 export interface FormState {
@@ -96,6 +107,14 @@ export interface FormState {
   auth_env_var: string;
   auth_header_name: string;
   auth_value_prefix: string;
+  auth_inject: AuthInjectItem[];
+
+  // Errors
+  errors_message_path: string;
+  errors_code_path: string;
+  errors_status_path: string;
+  /** Comma-separated → array in YAML. */
+  errors_success_values: string;
 
   // Docs
   docs_website: string;
