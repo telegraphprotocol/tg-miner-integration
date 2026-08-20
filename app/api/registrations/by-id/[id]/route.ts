@@ -9,7 +9,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const { id } = await params;
 
-  const upstream = await fetch(`${validatorUrl}/engine/validator/v1/miner-registrations/${id}`);
+  // /api/miners/{id} is the documented contract for miners/frontends (snake_case, includes
+  // `retrying`) — /engine/validator/v1/miner-registrations/{id} is an internal surface with
+  // Go-cased fields that the API reference explicitly says to prefer this one over.
+  const upstream = await fetch(`${validatorUrl}/api/miners/${id}`);
   const data = await upstream.json();
   return NextResponse.json(data, { status: upstream.status });
 }

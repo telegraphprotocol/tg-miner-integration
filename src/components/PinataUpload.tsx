@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAccount } from 'wagmi';
 import type { PinataResult } from '../types';
 import YamlPreview from './YamlPreview';
 import { useToast } from './Toast';
@@ -14,6 +15,11 @@ interface ValidationResult {
   latency_ms: number;
 }
 
+interface ValidationConflict {
+  field: string;
+  message: string;
+}
+
 interface ValidationResponse {
   valid: boolean;
   slug?: string;
@@ -21,6 +27,11 @@ interface ValidationResponse {
   errors: string[];
   results: ValidationResult[] | null;
   api_key_stored: boolean;
+  /** Set when the key was tested but couldn't be stored yet (no live registration) — it's held for miner_address instead. */
+  api_key_staged?: boolean;
+  staged_until?: string;
+  /** Identity pre-checks (duplicate id / slug owned by another wallet) — same rejections registerMiner would hit, without spending gas. */
+  conflicts?: ValidationConflict[];
 }
 
 interface Props {
@@ -36,6 +47,7 @@ type UploadState = 'idle' | 'validating' | 'uploading' | 'done' | 'error';
 
 export default function PinataUpload({ yaml, name, result, onResult, onBack, onNext }: Props) {
   const toast = useToast();
+  const { address } = useAccount();
   const [state, setState] = useState<UploadState>(result ? 'done' : 'idle');
   const [requiresApiKey, setRequiresApiKey] = useState(true);
   const [apiKey, setApiKey] = useState('');
@@ -43,6 +55,8 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationResults, setValidationResults] = useState<ValidationResult[] | null>(null);
   const [apiKeyStored, setApiKeyStored] = useState(false);
+  const [apiKeyStaged, setApiKeyStaged] = useState(false);
+  const [conflicts, setConflicts] = useState<ValidationConflict[]>([]);
 
   // result is owned by the parent and can be cleared out from under us (e.g. a fresh
   // YAML import) without this component remounting — re-sync instead of only seeding at mount.
@@ -62,12 +76,18 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
     setValidationErrors([]);
     setValidationResults(null);
     setApiKeyStored(false);
+    setApiKeyStaged(false);
+    setConflicts([]);
 
     try {
       const vRes = await fetch('/api/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ yaml, api_key: requiresApiKey ? apiKey.trim() : '' }),
+        body: JSON.stringify({
+          yaml,
+          api_key: requiresApiKey ? apiKey.trim() : '',
+          ...(address ? { miner_address: address } : {}),
+        }),
       });
       if (!vRes.ok && vRes.status !== 200) {
         const vErr = await vRes.json().catch(() => null);
@@ -77,6 +97,8 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
       const vData = await vRes.json() as ValidationResponse;
       setValidationResults(vData.results ?? null);
       setApiKeyStored(vData.api_key_stored);
+      setApiKeyStaged(!!vData.api_key_staged);
+      setConflicts(vData.conflicts ?? []);
       if (!vData.valid) {
         setValidationErrors(vData.errors ?? ['Unknown validation error']);
         setState('error');
@@ -225,6 +247,23 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
             </div>
           )}
 
+          {conflicts.length > 0 && (
+            <div className="reg-info-panel reg-info-panel-error" style={{ marginBottom: '16px' }}>
+              <div className="reg-info-title reg-info-title-error">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                Would Be Rejected On-Chain
+              </div>
+              <ul className="reg-info-list reg-info-list-error" style={{ paddingLeft: '16px' }}>
+                {conflicts.map((c, i) => <li key={i}>{c.message}</li>)}
+              </ul>
+              <p className="field-hint" style={{ margin: 0 }}>
+                This is the same rejection registerMiner would hit — fix it before spending gas.
+              </p>
+            </div>
+          )}
+
           {validationResults && validationResults.length > 0 && (
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', opacity: 0.55, marginBottom: '8px' }}>
@@ -237,11 +276,22 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
                     API KEY STORED
                   </span>
                 )}
+                {!apiKeyStored && apiKeyStaged && (
+                  <span className="reg-status-badge wasm-status-pending" style={{ marginLeft: '8px' }}>
+                    KEY STAGED
+                  </span>
+                )}
               </div>
-              {requiresApiKey && !apiKeyStored && (
+              {requiresApiKey && apiKeyStaged && !apiKeyStored && (
                 <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
-                  Key was tested but not stored — this slug isn't registered on-chain yet.
-                  Install it from your Dashboard once registration is confirmed.
+                  Key tested and staged against your connected wallet — it installs automatically
+                  the moment that wallet's registration lands, no extra step needed.
+                </p>
+              )}
+              {requiresApiKey && !apiKeyStored && !apiKeyStaged && (
+                <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
+                  Key was tested but not staged — connect a wallet before validating so it can be
+                  staged for auto-install, or install it from your Dashboard after registering.
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

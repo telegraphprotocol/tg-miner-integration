@@ -25,6 +25,22 @@ interface Props {
 type Tab = 'wasm' | 'yaml';
 
 const POLL_INTERVAL_MS = 15000;
+const PAGE_SIZE = 3;
+
+function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 16 }}>
+      <button type="button" className="btn-ghost" onClick={() => onChange(page - 1)} disabled={page <= 1}>
+        ← Prev
+      </button>
+      <span className="field-hint" style={{ margin: 0 }}>Page {page} of {totalPages}</span>
+      <button type="button" className="btn-ghost" onClick={() => onChange(page + 1)} disabled={page >= totalPages}>
+        Next →
+      </button>
+    </div>
+  );
+}
 
 function statusBadgeClass(status: string): string {
   if (status === 'active') return 'badge-success';
@@ -148,11 +164,11 @@ function MinerRow({ record, onDeregistered, onEdit }: {
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || 'Could not reach the registry node.'); return; }
       const miner = data.miner ?? data;
-      const reason = miner.RejectionReason ? ` — ${miner.RejectionReason}` : '';
-      const msg = `Registration #${record.RegistrationID}: ${String(miner.ActivationStatus).toUpperCase()}${reason}`;
+      const reason = miner.rejection_reason ? ` — ${miner.rejection_reason}` : '';
+      const msg = `Registration #${record.RegistrationID}: ${String(miner.activation_status).toUpperCase()}${reason}`;
       // Mirrors statusBadgeClass() below: active=green, rejected/deregistered=red, else=yellow.
-      if (miner.ActivationStatus === 'active') toast.success(msg);
-      else if (miner.ActivationStatus === 'rejected' || miner.ActivationStatus === 'deregistered') toast.error(msg);
+      if (miner.activation_status === 'active') toast.success(msg);
+      else if (miner.activation_status === 'rejected' || miner.activation_status === 'deregistered') toast.error(msg);
       else toast.warning(msg); // pending / unreachable / superseded
     } catch {
       toast.error('Network error checking status.');
@@ -237,6 +253,7 @@ function MinerRow({ record, onDeregistered, onEdit }: {
 export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Props) {
   const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>('wasm');
+  const [page, setPage] = useState(1);
   const { miners, wasm, isLoading, error, refetch } = useAddressRegistrations(address);
 
   useEffect(() => {
@@ -245,8 +262,20 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
     return () => clearInterval(id);
   }, [isConnected, refetch]);
 
-  const wasmRecords = wasm;
-  const yamlRecords = miners;
+  useEffect(() => {
+    setPage(1);
+  }, [tab]);
+
+  const newestFirst = <T extends { RegisteredAt: string }>(records: T[]): T[] =>
+    [...records].sort((a, b) => new Date(b.RegisteredAt).getTime() - new Date(a.RegisteredAt).getTime());
+
+  const wasmRecords = newestFirst(wasm);
+  const yamlRecords = newestFirst(miners);
+
+  const activeRecords = tab === 'wasm' ? wasmRecords : yamlRecords;
+  const totalPages = Math.max(1, Math.ceil(activeRecords.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageRecords = activeRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="app">
@@ -295,11 +324,11 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
         <div className="sub-tabs sub-tabs-lg" style={{ marginBottom: '20px', paddingBottom: '10px', justifyContent: 'space-between', alignItems: 'center', display: 'flex' }}>
           <div style={{ display: 'flex' }}>
             <button type="button" className={`sub-tab sub-tab-lg ${tab === 'wasm' ? 'sub-tab-active' : ''}`} onClick={() => setTab('wasm')}>
-              WASM
+              Evaluation WASMs
               {wasmRecords.length > 0 && <span className="sub-tab-count">{wasmRecords.length}</span>}
             </button>
             <button type="button" className={`sub-tab sub-tab-lg ${tab === 'yaml' ? 'sub-tab-active' : ''}`} onClick={() => setTab('yaml')}>
-              YAML
+              Miners
               {yamlRecords.length > 0 && <span className="sub-tab-count">{yamlRecords.length}</span>}
             </button>
           </div>
@@ -341,11 +370,14 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
               <p className="dashboard-empty-desc">Register a scoring module from the landing page to see it here.</p>
             </div>
           ) : (
-            <div className="reg-list">
-              {wasmRecords.map(r => (
-                <WasmRow key={r.RegistrationID} record={r} onDeregistered={refetch} />
-              ))}
-            </div>
+            <>
+              <div className="reg-list">
+                {(pageRecords as WasmRecordApi[]).map(r => (
+                  <WasmRow key={r.RegistrationID} record={r} onDeregistered={refetch} />
+                ))}
+              </div>
+              <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
+            </>
           )
         ) : yamlRecords.length === 0 ? (
           <div className="dashboard-empty">
@@ -353,11 +385,14 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
             <p className="dashboard-empty-desc">Register a miner from the landing page to see it here.</p>
           </div>
         ) : (
-          <div className="reg-list">
-            {yamlRecords.map(r => (
-              <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => onEditMiner(r)} />
-            ))}
-          </div>
+          <>
+            <div className="reg-list">
+              {(pageRecords as MinerRecordApi[]).map(r => (
+                <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => onEditMiner(r)} />
+              ))}
+            </div>
+            <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
+          </>
         )}
         </div>
       </div>

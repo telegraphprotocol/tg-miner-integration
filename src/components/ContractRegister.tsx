@@ -8,7 +8,6 @@ import { decodeEventLog } from 'viem';
 import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
 import AuthModal from './AuthModal';
-import Spinner from './Spinner';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { useSession } from '../hooks/useSession';
@@ -132,11 +131,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
     }
   }, [isSuccess, isReverted, txHash, toast, address, effectiveUrl, effectiveHash, feeAddress, minPrice, effectiveIntents, reset, isEdit]);
 
-  // ── Live status polling — decode registrationId from the receipt's MinerRegistered
-  // event so the success screen shows real activation status instead of waiting
-  // 2-3 minutes for the address-bundle indexer used elsewhere in the app. ──
+  // Decode registrationId from the receipt's MinerRegistered event — immediate,
+  // no dependency on the registry's own indexing/serving lag.
   const [freshRegistrationId, setFreshRegistrationId] = useState<string | null>(null);
-  const [liveStatus, setLiveStatus] = useState<{ activationStatus: string; rejectionReason: string | null } | null>(null);
 
   useEffect(() => {
     if (!isSuccess || !receipt) return;
@@ -150,42 +147,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
       }
     }
   }, [isSuccess, receipt]);
-
-  const TERMINAL_STATUSES = ['active', 'rejected', 'superseded', 'deregistered'];
-  const MAX_POLL_ATTEMPTS = 20; // ~80s at 4s intervals before giving up with a visible error
-  const [statusPollError, setStatusPollError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!freshRegistrationId) return;
-    let cancelled = false;
-    let attempts = 0;
-    let interval: ReturnType<typeof setInterval>;
-
-    const poll = async () => {
-      attempts += 1;
-      try {
-        const res = await fetch(`/api/registrations/by-id/${freshRegistrationId}`);
-        if (cancelled) return;
-        if (!res.ok) throw new Error(`Registry returned HTTP ${res.status}`);
-        const data = await res.json();
-        const miner = data.miner ?? data;
-        const next = { activationStatus: miner.ActivationStatus, rejectionReason: miner.RejectionReason ?? null };
-        setStatusPollError(null);
-        setLiveStatus(next);
-        if (TERMINAL_STATUSES.includes(next.activationStatus)) clearInterval(interval);
-      } catch (err) {
-        if (cancelled) return;
-        if (attempts >= MAX_POLL_ATTEMPTS) {
-          setStatusPollError((err as Error).message || 'Could not reach the registry node.');
-          clearInterval(interval);
-        }
-      }
-    };
-
-    poll();
-    interval = setInterval(poll, 4000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [freshRegistrationId]);
 
   useEffect(() => {
     if (txError) toast.error(friendlyRevertMessage(txError.message ?? 'Transaction failed.'));
@@ -627,44 +588,15 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                       <span className="result-row-label">REGISTRATION ID</span>
                       <span className="result-row-value result-mono">{freshRegistrationId}</span>
                     </div>
-                    <div className="wallet-info-row">
-                      <span className="result-row-label">LIVE STATUS</span>
-                      <span className="result-row-value">
-                        {liveStatus
-                          ? <span className={`reg-status-badge ${liveStatus.activationStatus === 'active' ? 'badge-success' : liveStatus.activationStatus === 'rejected' ? 'wasm-status-bad' : 'wasm-status-pending'}`}>
-                              {String(liveStatus.activationStatus ?? 'unknown').toUpperCase()}
-                            </span>
-                          : statusPollError
-                            ? <span className="reg-status-badge wasm-status-bad">UNAVAILABLE</span>
-                            : <><Spinner /> checking…</>}
-                      </span>
-                    </div>
-                    {statusPollError && !liveStatus && (
-                      <p className="field-hint" style={{ marginTop: 6 }}>
-                        Couldn't reach the registry node ({statusPollError}) — your registration was still
-                        confirmed on-chain. Check your Dashboard in a couple minutes instead.
-                      </p>
-                    )}
-                    {liveStatus?.rejectionReason && (
-                      <>
-                        <p className="field-error" style={{ marginTop: 6 }}>{liveStatus.rejectionReason}</p>
-                        {liveStatus.activationStatus === 'rejected' && (
-                          <p className="field-hint" style={{ marginTop: 2 }}>
-                            This slug is now free — fix the issue and re-submit (Edit) promptly.
-                          </p>
-                        )}
-                      </>
-                    )}
+                    <p className="field-hint" style={{ marginTop: 6 }}>
+                      It will be indexed and usable in 3-5 minutes.
+                    </p>
                   </div>
                 )}
               </div>
             </div>
           )}
         </div>
-      </div>
-
-      <div className="step-footer">
-        <button className="btn-ghost" onClick={onBack}>← Back</button>
       </div>
 
       {showHashModal && (
