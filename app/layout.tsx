@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import '../src/index.css';
 import Providers from '../src/providers';
+import GlobalProviders from '../src/components/GlobalProviders';
 
 export const metadata: Metadata = {
   title: 'Telegraph · Developer Console',
@@ -54,7 +55,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
 twq('config','rcv9y');`}
         </Script>
-        <Providers>{children}</Providers>
+        <Providers>
+          <GlobalProviders>{children}</GlobalProviders>
+        </Providers>
       </body>
     </html>
   );

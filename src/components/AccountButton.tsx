@@ -1,28 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'nextjs-toploader/app';
 import { useSession } from '../hooks/useSession';
-import AuthModal from './AuthModal';
 import Spinner from './Spinner';
-import { useOpenAuthSignal, type AuthTab } from '../hooks/useOpenAuthSignal';
 
-interface Props {
-  onOpenDashboard: () => void;
-  onOpenProfile: () => void;
-}
-
-export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props) {
-  const { user, isLoading, refetch, logout } = useSession();
+export default function AccountButton() {
+  const router = useRouter();
+  const { user, isLoading, logout } = useSession();
   const [open, setOpen] = useState(false);
-  const [authTab, setAuthTab] = useState<AuthTab>('login');
   const [loggingOut, setLoggingOut] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
-
-  useOpenAuthSignal(tab => {
-    if (user) return;
-    setAuthTab(tab);
-    setOpen(true);
-  });
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -72,7 +60,7 @@ export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props)
             <button
               type="button"
               className="ext-links-dropdown-item account-dropdown-item"
-              onClick={() => { setOpen(false); onOpenDashboard(); }}
+              onClick={() => { setOpen(false); router.push('/dashboard'); }}
             >
               Dashboard
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -85,7 +73,7 @@ export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props)
             <button
               type="button"
               className="ext-links-dropdown-item account-dropdown-item"
-              onClick={() => { setOpen(false); onOpenProfile(); }}
+              onClick={() => { setOpen(false); router.push('/profile'); }}
             >
               Profile
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -116,22 +104,12 @@ export default function AccountButton({ onOpenDashboard, onOpenProfile }: Props)
   }
 
   return (
-    <div className="account-btn-wrap" ref={wrapRef}>
-      <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => { setAuthTab('login'); setOpen(v => !v); }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
-        </svg>
-        Login
-      </button>
-      {open && (
-        <AuthModal
-          variant="dropdown"
-          defaultTab={authTab}
-          onClose={() => setOpen(false)}
-          onAuthed={() => { setOpen(false); refetch(); }}
-        />
-      )}
-    </div>
+    <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => router.push('/login?tab=login')}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+      Login
+    </button>
   );
 }

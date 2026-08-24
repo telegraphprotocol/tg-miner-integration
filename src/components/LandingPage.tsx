@@ -1,24 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useAccount } from 'wagmi';
+import { useRouter } from 'nextjs-toploader/app';
 import { emitIntentSignal } from '../hooks/useIntentSignal';
-import { emitOpenAuthSignal } from '../hooks/useOpenAuthSignal';
 import WalletBar from './WalletBar';
 import LiveLeaderboard from './LiveLeaderboard';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
 import { useSession } from '../hooks/useSession';
-
-interface Props {
-  onCreate: () => void;
-  onImportToUpload: () => void;
-  onRegisterDirect: () => void;
-  onOpenDashboard: () => void;
-  onOpenProfile: () => void;
-  onRegisterWasm: () => void;
-  onOpenIntegrate: () => void;
-}
 
 const CARDS = [
   {
@@ -28,6 +17,7 @@ const CARDS = [
     desc: 'Build a new API config from scratch using the step-by-step wizard.',
     cta: 'Start building →',
     tags: ['Wizard', 'From scratch'],
+    mode: 'create',
   },
   {
     key: 'import',
@@ -36,6 +26,7 @@ const CARDS = [
     desc: 'Import an existing YAML file, review parsed values, and pin to IPFS.',
     cta: 'Import YAML →',
     tags: ['Import', 'IPFS · Pinata'],
+    mode: 'import',
   },
   {
     key: 'register',
@@ -44,6 +35,7 @@ const CARDS = [
     desc: 'Already have an IPFS hash? Submit directly to the registry contract on Base Sepolia.',
     cta: 'Register now →',
     tags: ['Base Sepolia', 'Registry'],
+    mode: 'hash',
   },
 ] as const;
 
@@ -54,7 +46,6 @@ const ROOT_CARDS = [
     desc: 'Hook your API in 2 minutes. Get scored, climb the leaderboard, and compete to win paid requests directly from machines & agents.',
     cta: 'Continue →',
     tags: ['API', 'Available now'],
-    gated: false,
   },
   {
     key: 'wasm',
@@ -62,7 +53,6 @@ const ROOT_CARDS = [
     desc: 'Write evaluation scripts. Build the logic that scores APIs, and earn recurring revenue every time your script runs.',
     cta: 'Continue →',
     tags: ['WASM', 'Available now'],
-    gated: false,
   },
   {
     key: 'integrate',
@@ -70,29 +60,36 @@ const ROOT_CARDS = [
     desc: 'Power your agents with scored intelligence. Drop in our 1-line SDK to automatically route requests to the top-scoring providers.',
     cta: 'Explore →',
     tags: ['MCP · WebSocket', 'SDK'],
-    gated: false,
   },
 ] as const;
 
 type Choice = 'root' | 'yaml';
 
-export default function LandingPage({ onCreate, onImportToUpload, onRegisterDirect, onOpenDashboard, onOpenProfile, onRegisterWasm, onOpenIntegrate }: Props) {
-  const { isConnected } = useAccount();
+const REASON = 'You need to register in order to progress';
+
+export default function LandingPage() {
+  const router = useRouter();
   const { user } = useSession();
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [choice, setChoice] = useState<Choice>('root');
 
+  const requireAuth = (next: string): boolean => {
+    if (user) return true;
+    router.push(`/login?tab=signup&reason=${encodeURIComponent(REASON)}&next=${encodeURIComponent(next)}`);
+    return false;
+  };
+
   const rootHandlers: Record<string, () => void> = {
-    yaml: () => setChoice('yaml'),
-    wasm: onRegisterWasm,
-    integrate: onOpenIntegrate,
+    yaml: () => { if (requireAuth('/')) setChoice('yaml'); },
+    wasm: () => { if (requireAuth('/wasm')) router.push('/wasm'); },
+    integrate: () => { if (requireAuth('/integrate')) router.push('/integrate'); },
   };
 
   const handlers: Record<string, () => void> = {
-    create: onCreate,
-    import: onImportToUpload,
-    register: onRegisterDirect,
+    create: () => router.push('/register?mode=create'),
+    import: () => router.push('/register?mode=import'),
+    register: () => router.push('/register?mode=hash'),
   };
 
   return (
@@ -129,7 +126,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
 
         <div className={`lv2-nav-links ${menuOpen ? 'lv2-nav-links-open' : ''}`}>
           <ExternalLinksNav mode="inline" onNavigate={() => setMenuOpen(false)} />
-          <AccountButton onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} />
+          <AccountButton />
           <WalletBar />
         </div>
       </nav>
@@ -160,10 +157,7 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
                   className="lv2-hero-cta-primary"
                   onClick={() => {
                     emitIntentSignal();
-                    // AccountButton (and the modal it opens) lives inside the mobile hamburger
-                    // panel — it's off-screen until that panel itself is open.
-                    setMenuOpen(true);
-                    emitOpenAuthSignal('signup');
+                    router.push('/login?tab=signup');
                   }}
                 >
                   Register Now →
@@ -173,15 +167,12 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
 
             <div className="lv2-cards-block" id="root-cards">
               <div className="lv2-cards lv2-cards-root">
-                {ROOT_CARDS.map(card => {
-                  const locked = card.gated && !isConnected;
-                  return (
+                {ROOT_CARDS.map(card => (
                   <button
                     key={card.key}
                     id={card.key === 'yaml' ? 'root-card-yaml' : undefined}
                     type="button"
-                    className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}${locked ? ' lv2-card-disabled' : ''}`}
-                    disabled={locked}
+                    className={`lv2-card lv2-card-root${hovered === card.key ? ' lv2-card-active' : ''}`}
                     onClick={() => { emitIntentSignal(); rootHandlers[card.key](); }}
                     onMouseEnter={() => setHovered(card.key)}
                     onMouseLeave={() => setHovered(null)}
@@ -200,16 +191,13 @@ export default function LandingPage({ onCreate, onImportToUpload, onRegisterDire
 
                     <div className="lv2-card-cta">
                       {card.cta}
-                      {!locked && (
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <line x1="5" y1="12" x2="19" y2="12"/>
-                          <polyline points="12 5 19 12 12 19"/>
-                        </svg>
-                      )}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <line x1="5" y1="12" x2="19" y2="12"/>
+                        <polyline points="12 5 19 12 12 19"/>
+                      </svg>
                     </div>
                   </button>
-                  );
-                })}
+                ))}
               </div>
             </div>
 

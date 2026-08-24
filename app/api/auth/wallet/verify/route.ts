@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (user.walletAddress && user.walletAddress.toLowerCase() !== String(address).toLowerCase()) {
-      return NextResponse.json({ error: 'You already have a wallet linked — delink it first before linking a different one.' }, { status: 409 });
+      return NextResponse.json({ error: 'This account already has a linked wallet.' }, { status: 409 });
     }
 
     const message = buildWalletLinkMessage({ address, nonce: user.walletNonce, issuedAt: user.walletNonceIssuedAt });

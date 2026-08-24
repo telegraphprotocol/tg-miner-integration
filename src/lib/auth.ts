@@ -52,8 +52,6 @@ export async function signSession(payload: SessionPayload): Promise<string> {
   return signToken(payload, 'session', '30d');
 }
 
-export const WALLET_UNLINK_COOLDOWN_MS = 14 * 24 * 60 * 60 * 1000;
-
 export const LOGIN_MAX_ATTEMPTS = 5;
 export const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
 
@@ -67,8 +65,8 @@ export interface AuthedUser {
   id: string;
   email: string;
   walletAddress: string | null;
-  /** ISO timestamp — null unless a delink cooldown is currently active. */
-  walletUnlinkCooldownUntil: string | null;
+  /** ISO 3166-1 alpha-2 code, e.g. "US". Null until the user completes the mandatory profile step. */
+  country: string | null;
   firstName: string | null;
   lastName: string | null;
   discordUsername: string | null;
@@ -90,14 +88,11 @@ export async function getSessionUser(req: NextRequest): Promise<AuthedUser | nul
   const user = await users.findOne({ _id: new ObjectId(userId) });
   if (!user) return null;
 
-  const cooldownUntilMs = user.walletUnlinkedAt ? user.walletUnlinkedAt.getTime() + WALLET_UNLINK_COOLDOWN_MS : 0;
-  const walletUnlinkCooldownUntil = cooldownUntilMs > Date.now() ? new Date(cooldownUntilMs).toISOString() : null;
-
   return {
     id: user._id!.toString(),
     email: user.email,
     walletAddress: user.walletAddress ?? null,
-    walletUnlinkCooldownUntil,
+    country: user.country ?? null,
     firstName: user.firstName ?? null,
     lastName: user.lastName ?? null,
     discordUsername: user.discordUsername ?? null,

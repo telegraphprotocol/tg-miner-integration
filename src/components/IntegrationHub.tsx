@@ -1,14 +1,10 @@
 'use client';
 
+import { useRouter } from 'nextjs-toploader/app';
+import AppBackground from './AppBackground';
 import Header from './Header';
 import { TELEGRAPH_NODE_URL } from '../wasmAbi';
 import { USE_CASES } from '../useCases';
-
-interface Props {
-  onGoHome: () => void;
-  onOpenDashboard: () => void;
-  onOpenProfile: () => void;
-}
 
 function ExternalLinkIcon() {
   return (
@@ -19,10 +15,12 @@ function ExternalLinkIcon() {
   );
 }
 
-export default function IntegrationHub({ onGoHome, onOpenDashboard, onOpenProfile }: Props) {
+export default function IntegrationHub() {
+  const router = useRouter();
   return (
     <div className="app">
-      <Header onGoHome={onGoHome} onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} onBack={onGoHome} />
+      <AppBackground />
+      <Header onBack={() => router.push('/')} />
       <div className="app-body">
         <div className="register-layout">
           <div className="step-section-heading">
@@ -31,7 +29,7 @@ export default function IntegrationHub({ onGoHome, onOpenDashboard, onOpenProfil
             <p className="step-desc">
               Call Telegraph's network of miners from your own agents and apps — REST, WebSocket, MCP,
               or fork a working example below. Looking for the live leaderboard instead? It's on{' '}
-              <button type="button" className="inline-link-btn" onClick={onGoHome}>the homepage</button>.
+              <button type="button" className="inline-link-btn" onClick={() => router.push('/')}>the homepage</button>.
             </p>
           </div>
 

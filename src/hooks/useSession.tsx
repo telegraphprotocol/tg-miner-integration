@@ -1,11 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 export interface SessionUser {
   email: string;
   walletAddress: string | null;
-  walletUnlinkCooldownUntil: string | null;
+  country: string | null;
   firstName: string | null;
   lastName: string | null;
   discordUsername: string | null;
@@ -13,12 +13,16 @@ export interface SessionUser {
   profileLocked: boolean;
 }
 
-export function useSession(): {
+interface SessionContextValue {
   user: SessionUser | null;
   isLoading: boolean;
   refetch: () => void;
   logout: () => Promise<void>;
-} {
+}
+
+const SessionContext = createContext<SessionContextValue | null>(null);
+
+export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,5 +51,13 @@ export function useSession(): {
     setUser(null);
   }, []);
 
-  return { user, isLoading, refetch: fetchSession, logout };
+  const value = useMemo(() => ({ user, isLoading, refetch: fetchSession, logout }), [user, isLoading, fetchSession, logout]);
+
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+}
+
+export function useSession(): SessionContextValue {
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error('useSession must be used within a SessionProvider');
+  return ctx;
 }

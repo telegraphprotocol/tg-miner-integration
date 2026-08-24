@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'nextjs-toploader/app';
 import { useAccount, useWaitForTransactionReceipt, useWriteContract } from 'wagmi';
+import AppBackground from './AppBackground';
 import Header from './Header';
 import Spinner from './Spinner';
 import ApiKeyModal from './ApiKeyModal';
@@ -15,12 +17,6 @@ import {
   type MinerRecordApi,
   type WasmRecordApi,
 } from '../wasmAbi';
-
-interface Props {
-  onGoHome: () => void;
-  onOpenProfile: () => void;
-  onEditMiner: (record: MinerRecordApi) => void;
-}
 
 type Tab = 'wasm' | 'yaml';
 
@@ -250,7 +246,8 @@ function MinerRow({ record, onDeregistered, onEdit }: {
   );
 }
 
-export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Props) {
+export default function Dashboard() {
+  const router = useRouter();
   const { address, isConnected } = useAccount();
   const [tab, setTab] = useState<Tab>('wasm');
   const [page, setPage] = useState(1);
@@ -279,7 +276,8 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
 
   return (
     <div className="app">
-      <Header onGoHome={onGoHome} onOpenDashboard={() => {}} onOpenProfile={onOpenProfile} onBack={onGoHome} />
+      <AppBackground />
+      <Header onBack={() => router.push('/')} />
 
       <div className="app-body">
         <div className="dashboard-body">
@@ -388,7 +386,7 @@ export default function Dashboard({ onGoHome, onOpenProfile, onEditMiner }: Prop
           <>
             <div className="reg-list">
               {(pageRecords as MinerRecordApi[]).map(r => (
-                <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => onEditMiner(r)} />
+                <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => router.push(`/register/edit/${r.RegistrationID}`)} />
               ))}
             </div>
             <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />

@@ -6,8 +6,14 @@ import { useSession } from '../hooks/useSession';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
 
-function daysRemaining(untilIso: string): number {
-  return Math.max(1, Math.ceil((new Date(untilIso).getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
+function WalletIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="7" width="20" height="14" rx="2" />
+      <path d="M16 3H8a2 2 0 0 0-2 2v2h12V5a2 2 0 0 0-2-2z" />
+      <circle cx="17" cy="14" r="1.5" fill="currentColor" />
+    </svg>
+  );
 }
 
 export default function LinkWalletCard() {
@@ -16,15 +22,12 @@ export default function LinkWalletCard() {
   const { address, isConnected } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [busy, setBusy] = useState(false);
-  const [delinkBusy, setDelinkBusy] = useState(false);
 
   if (!user) return null;
 
   const hasLinkedWallet = !!user.walletAddress;
   const alreadyLinkedHere = hasLinkedWallet && !!address && user.walletAddress?.toLowerCase() === address.toLowerCase();
   const connectedDiffersFromLinked = hasLinkedWallet && !!address && user.walletAddress?.toLowerCase() !== address.toLowerCase();
-  const cooldownActive = !!user.walletUnlinkCooldownUntil;
-  const cooldownDays = user.walletUnlinkCooldownUntil ? daysRemaining(user.walletUnlinkCooldownUntil) : 0;
 
   const handleLink = async () => {
     if (!address) return;
@@ -53,58 +56,32 @@ export default function LinkWalletCard() {
     }
   };
 
-  const handleDelink = async () => {
-    setDelinkBusy(true);
-    try {
-      const res = await fetch('/api/auth/wallet/unlink', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not delink wallet.'); return; }
-      toast.success('Wallet delinked from your account.');
-      refetch();
-    } catch {
-      toast.error('Network error. Please try again.');
-    } finally {
-      setDelinkBusy(false);
-    }
-  };
-
   return (
-    <div className="register-card register-card-full link-wallet-card">
-      <div className="register-card-header"><span>Account Wallet</span></div>
+    <div className="profile-section link-wallet-card">
+      <div className="profile-section-header">
+        <span className="profile-section-icon"><WalletIcon /></span>
+        <span className="profile-section-label">Account Wallet</span>
+        {hasLinkedWallet && (
+          <span className="profile-section-action">
+            <span className={`profile-status-dot ${alreadyLinkedHere ? 'profile-status-dot-on' : ''}`} />
+            {alreadyLinkedHere ? 'Linked' : 'Linked · Not Connected'}
+          </span>
+        )}
+      </div>
 
       {hasLinkedWallet && (
         <>
-          <div className="link-wallet-row">
-            <span className={`reg-status-badge ${alreadyLinkedHere ? 'badge-success' : 'wasm-status-pending'}`}>
-              {alreadyLinkedHere ? 'LINKED' : 'LINKED · NOT CONNECTED'}
-            </span>
-            <div className="link-wallet-row-text">
-              <span className="result-mono link-wallet-address">{user.walletAddress}</span>
-              <span className="field-hint">
-                {alreadyLinkedHere
-                  ? `Linked to ${user.email}. Only this wallet can submit registrations for your account.`
-                  : connectedDiffersFromLinked
-                    ? 'Connect this wallet above to use it for registration.'
-                    : `Linked to ${user.email}. Connect it above to use it for registration.`}
-              </span>
-            </div>
+          <div className="profile-value-pill profile-value-pill-icon link-wallet-address-pill">
+            <span className="result-mono">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : `${user.walletAddress!.slice(0, 6)}...${user.walletAddress!.slice(-4)}`}</span>
           </div>
-
           <p className="field-hint link-wallet-note">
-            You can only delink a wallet once every 14 days.
-            {cooldownActive && ` You delinked recently — try again in ${cooldownDays} day${cooldownDays === 1 ? '' : 's'}.`}
+            {alreadyLinkedHere
+              ? `Linked to ${user.email}. Only this wallet can submit registrations for your account.`
+              : connectedDiffersFromLinked
+                ? 'Connect this wallet above to use it for registration.'
+                : `Linked to ${user.email}. Connect it above to use it for registration.`}
+            {' '}Wallets are linked permanently and cannot be delinked.
           </p>
-          <button
-            type="button"
-            className={`btn-ghost reg-danger link-wallet-btn ${delinkBusy ? 'btn-loading' : ''}`}
-            onClick={handleDelink}
-            disabled={delinkBusy || cooldownActive}
-            title={cooldownActive ? `Available again in ${cooldownDays} day${cooldownDays === 1 ? '' : 's'}` : undefined}
-          >
-            {delinkBusy
-              ? <><Spinner /> Delinking…</>
-              : cooldownActive ? `Delink Wallet (${cooldownDays}d remaining)` : 'Delink Wallet'}
-          </button>
         </>
       )}
 
@@ -114,13 +91,10 @@ export default function LinkWalletCard() {
 
       {!hasLinkedWallet && isConnected && (
         <>
-          <div className="link-wallet-row">
-            <span className="reg-status-badge wasm-status-pending">NOT LINKED</span>
-            <div className="link-wallet-row-text">
-              <span className="result-mono link-wallet-address">{address}</span>
-              <span className="field-hint">Sign a free message to link this wallet — no transaction, no gas.</span>
-            </div>
+          <div className="profile-value-pill profile-value-pill-icon link-wallet-address-pill">
+            <span className="result-mono">{address}</span>
           </div>
+          <p className="field-hint" style={{ marginBottom: 12 }}>Sign a free message to link this wallet — no transaction, no gas.</p>
           <button type="button" className={`btn-fill link-wallet-btn ${busy ? 'btn-loading' : ''}`} onClick={handleLink} disabled={busy}>
             {busy ? <><Spinner /> Waiting for signature…</> : 'Link Wallet'}
           </button>

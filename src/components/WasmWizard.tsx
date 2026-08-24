@@ -20,14 +20,11 @@ import { useToast } from './Toast';
 import WalletBar from './WalletBar';
 import Spinner from './Spinner';
 import IntentSearchList from './IntentSearchList';
-import AuthModal from './AuthModal';
+import { usePathname } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 import { useSession } from '../hooks/useSession';
 
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
-
-interface Props {
-  onDone: () => void;
-}
 
 type Phase = 'select' | 'hashed' | 'verified';
 type SourceMode = 'upload' | 'link';
@@ -43,12 +40,13 @@ function Tip({ text }: { text: string }) {
   );
 }
 
-export default function WasmWizard({ onDone }: Props) {
+export default function WasmWizard() {
   const toast = useToast();
   const { address, isConnected, chain } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
-  const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
-  const [showAuth, setShowAuth] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const { user, isLoading: sessionLoading } = useSession();
 
   const [sourceMode, setSourceMode] = useState<SourceMode>('link');
   const [file, setFile] = useState<File | null>(null);
@@ -264,7 +262,7 @@ export default function WasmWizard({ onDone }: Props) {
           </div>
         </div>
         <div className="step-footer">
-          <button className="btn-fill" onClick={onDone}>Go to Dashboard →</button>
+          <button className="btn-fill" onClick={() => router.push('/dashboard')}>Go to Dashboard →</button>
         </div>
       </div>
     );
@@ -468,7 +466,11 @@ export default function WasmWizard({ onDone }: Props) {
                   {!sessionLoading && !user && (
                     <div className="wallet-disconnected" style={{ marginTop: 12 }}>
                       <p className="wallet-disconnected-text">Sign in to register a WASM module.</p>
-                      <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setShowAuth(true)}>
+                      <button
+                        type="button"
+                        className="wallet-pill wallet-pill-accent"
+                        onClick={() => router.push(`/login?tab=login&next=${encodeURIComponent(pathname)}`)}
+                      >
                         Login
                       </button>
                     </div>
@@ -476,14 +478,6 @@ export default function WasmWizard({ onDone }: Props) {
                 </div>
               )}
             </div>
-
-            {showAuth && (
-              <AuthModal
-                defaultTab="login"
-                onClose={() => setShowAuth(false)}
-                onAuthed={() => { setShowAuth(false); refetchSession(); }}
-              />
-            )}
 
             <div className="register-card register-card-full">
               <div className="register-card-header"><span>Transaction</span></div>

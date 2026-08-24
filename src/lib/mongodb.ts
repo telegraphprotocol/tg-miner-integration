@@ -41,13 +41,14 @@ export interface UserDoc {
   email: string;
   passwordHash: string;
   /** Omitted entirely (not set to null) when unlinked — the unique index is sparse,
-   *  which only excludes documents missing the field, not documents with value null. */
+   *  which only excludes documents missing the field, not documents with value null.
+   *  Wallets can no longer be unlinked once set — one wallet per account, permanently. */
   walletAddress?: string | null;
   walletNonce: string | null;
   walletNonceIssuedAt: string | null;
   walletNonceExpiresAt: Date | null;
-  /** Last time a wallet was unlinked from this account — gates the 14-day re-delink cooldown. */
-  walletUnlinkedAt: Date | null;
+  /** ISO 3166-1 alpha-2 code, e.g. "US". Locked permanently once set. */
+  country: string | null;
   firstName: string | null;
   lastName: string | null;
   discordUsername: string | null;

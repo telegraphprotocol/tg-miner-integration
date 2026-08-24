@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/auth';
 import { getUsersCollection } from '@/lib/mongodb';
+import { isValidCountryCode } from '@/countries';
 
 const MAX_LEN = 60;
 
@@ -31,9 +32,13 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const updatingName = 'firstName' in body || 'lastName' in body;
+    const updatingCountry = 'country' in body;
 
     if (updatingName && existing.profileLocked) {
       return NextResponse.json({ error: 'Your name is locked and cannot be changed.' }, { status: 409 });
+    }
+    if (updatingCountry && existing.country) {
+      return NextResponse.json({ error: 'Your country is locked and cannot be changed.' }, { status: 409 });
     }
 
     const set: Record<string, unknown> = {};
@@ -44,6 +49,11 @@ export async function POST(req: NextRequest) {
         set.firstName = clean(body.firstName);
         set.lastName = clean(body.lastName);
         set.profileLocked = true;
+      }
+      if (updatingCountry) {
+        const countryCode = String(body.country ?? '').toUpperCase();
+        if (!isValidCountryCode(countryCode)) throw new Error('A valid country is required.');
+        set.country = countryCode;
       }
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 400 });
@@ -59,6 +69,7 @@ export async function POST(req: NextRequest) {
       discordUsername: updated!.discordUsername,
       xUsername: updated!.xUsername,
       profileLocked: updated!.profileLocked,
+      country: updated!.country,
     });
   } catch (err) {
     console.error('[profile]', err);

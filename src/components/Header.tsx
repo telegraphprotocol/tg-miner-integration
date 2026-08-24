@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'nextjs-toploader/app';
 import WalletBar from './WalletBar';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
@@ -7,9 +8,6 @@ import type { Step } from '../types';
 
 interface Props {
   step?: Step;
-  onGoHome: () => void;
-  onOpenDashboard: () => void;
-  onOpenProfile: () => void;
   onBack?: () => void;
 }
 
@@ -19,11 +17,13 @@ const STEPS = [
   { n: 3, label: 'Register On-Chain' },
 ];
 
-export default function Header({ step, onGoHome, onOpenDashboard, onOpenProfile, onBack }: Props) {
+export default function Header({ step, onBack }: Props) {
+  const router = useRouter();
+
   return (
     <header className="app-header">
       <div className="app-header-left">
-        <button type="button" className="app-header-logo app-header-logo-btn" onClick={onGoHome}>
+        <button type="button" className="app-header-logo app-header-logo-btn" onClick={() => router.push('/')}>
           <img src="/logo.png" alt="Telegraph" className="app-logo-img" />
           <span className="app-logo-text">TELEGRAPH</span>
         </button>
@@ -57,7 +57,7 @@ export default function Header({ step, onGoHome, onOpenDashboard, onOpenProfile,
 
       <div className="app-header-right">
         <ExternalLinksNav mode="dropdown" />
-        <AccountButton onOpenDashboard={onOpenDashboard} onOpenProfile={onOpenProfile} />
+        <AccountButton />
         <WalletBar />
       </div>
     </header>

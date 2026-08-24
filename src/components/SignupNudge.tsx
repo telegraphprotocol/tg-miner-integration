@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'nextjs-toploader/app';
 import { useSession } from '../hooks/useSession';
 import { useIntentSignal } from '../hooks/useIntentSignal';
-import AuthModal from './AuthModal';
 
 const FIRST_DELAY_MS = 25_000;
 const REPEAT_GAPS_MS = [60_000, 120_000, 240_000, 300_000];
@@ -27,9 +27,9 @@ function writeShowCount(n: number): void {
 }
 
 export default function SignupNudge() {
-  const { user, isLoading, refetch } = useSession();
+  const router = useRouter();
+  const { user, isLoading } = useSession();
   const [visible, setVisible] = useState(false);
-  const [modalOpen, setModalOpen] = useState(false);
   const showCountRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,7 @@ export default function SignupNudge() {
 
   const dismiss = (opts?: { convert?: boolean }) => {
     setVisible(false);
-    if (opts?.convert) setModalOpen(true);
+    if (opts?.convert) router.push('/login?tab=signup');
     scheduleNext();
   };
 
@@ -102,12 +102,6 @@ export default function SignupNudge() {
             <span className="signup-nudge-sub">Sign up free — 2 minutes →</span>
           </div>
         </div>
-      )}
-      {modalOpen && (
-        <AuthModal
-          onClose={() => setModalOpen(false)}
-          onAuthed={() => { setModalOpen(false); refetch(); }}
-        />
       )}
     </>
   );

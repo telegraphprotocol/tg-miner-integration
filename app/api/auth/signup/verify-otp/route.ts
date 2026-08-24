@@ -1,16 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword, signSession, verifyToken, validatePasswordStrength, SESSION_COOKIE } from '@/lib/auth';
 import { getUsersCollection } from '@/lib/mongodb';
+import { isValidCountryCode } from '@/countries';
 
 export async function POST(req: NextRequest) {
   try {
-    const { token, otp, password } = await req.json();
+    const { token, otp, password, country } = await req.json();
     if (!token || !otp || !password) {
       return NextResponse.json({ error: 'Missing token, code, or password' }, { status: 400 });
     }
     const passwordError = validatePasswordStrength(String(password));
     if (passwordError) {
       return NextResponse.json({ error: passwordError }, { status: 400 });
+    }
+    const countryCode = String(country ?? '').toUpperCase();
+    if (!isValidCountryCode(countryCode)) {
+      return NextResponse.json({ error: 'A valid country is required.' }, { status: 400 });
     }
 
     const payload = await verifyToken(token, 'signup');
@@ -36,7 +41,7 @@ export async function POST(req: NextRequest) {
       walletNonce: null,
       walletNonceIssuedAt: null,
       walletNonceExpiresAt: null,
-      walletUnlinkedAt: null,
+      country: countryCode,
       firstName: null,
       lastName: null,
       discordUsername: null,

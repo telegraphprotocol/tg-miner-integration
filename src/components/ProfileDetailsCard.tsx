@@ -4,6 +4,10 @@ import { useEffect, useState } from 'react';
 import { useSession } from '../hooks/useSession';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
+import CountrySelect from './CountrySelect';
+import CountryFlag from './CountryFlag';
+import { countryName } from '../countries';
+import { useGeoCountryGuess } from '../hooks/useGeoCountryGuess';
 
 function DiscordIcon() {
   return (
@@ -18,6 +22,56 @@ function XIcon() {
     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
     </svg>
+  );
+}
+
+function PersonIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+function AtIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M16 12v1.5a2.5 2.5 0 0 0 5 0V12a9 9 0 1 0-4.5 7.79" />
+    </svg>
+  );
+}
+
+function SectionHeader({ icon, label, action }: { icon: React.ReactNode; label: string; action?: React.ReactNode }) {
+  return (
+    <div className="profile-section-header">
+      <span className="profile-section-icon">{icon}</span>
+      <span className="profile-section-label">{label}</span>
+      {action && <span className="profile-section-action">{action}</span>}
+    </div>
+  );
+}
+
+function LockedBadge() {
+  return (
+    <span className="profile-locked-badge">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="5" y="11" width="14" height="10" rx="2" />
+        <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+      </svg>
+      Locked
+    </span>
   );
 }
 
@@ -59,18 +113,18 @@ function NameCard() {
 
   if (user.profileLocked) {
     return (
-      <div className="register-card register-card-full">
-        <div className="register-card-header"><span>Name</span></div>
-        <p className="profile-name-value">
+      <div className="profile-section">
+        <SectionHeader icon={<PersonIcon />} label="Name" action={<LockedBadge />} />
+        <div className="profile-value-pill">
           {[user.firstName, user.lastName].filter(Boolean).join(' ') || <span style={{ opacity: 0.5 }}>Not set</span>}
-        </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="register-card register-card-full">
-      <div className="register-card-header"><span>Name</span></div>
+    <div className="profile-section">
+      <SectionHeader icon={<PersonIcon />} label="Name" />
       <p className="field-hint" style={{ marginBottom: 16 }}>
         You can only set this once — double-check before saving, it can't be changed afterward.
       </p>
@@ -153,6 +207,74 @@ function NameCard() {
   );
 }
 
+function CountryCard() {
+  const toast = useToast();
+  const { user, refetch } = useSession();
+  const [country, setCountry] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const geoGuess = useGeoCountryGuess();
+  useEffect(() => {
+    if (geoGuess && !country) setCountry(geoGuess);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoGuess]);
+
+  if (!user) return null;
+
+  if (user.country) {
+    return (
+      <div className="profile-section">
+        <SectionHeader icon={<GlobeIcon />} label="Country" action={<LockedBadge />} />
+        <div className="profile-value-pill">
+          <CountryFlag code={user.country} /> {countryName(user.country)}
+        </div>
+      </div>
+    );
+  }
+
+  const handleSave = async () => {
+    if (!country) { toast.error('Select your country.'); return; }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ country }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Could not save country.'); return; }
+      toast.success('Country saved — it\'s now locked.');
+      refetch();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="profile-section">
+      <SectionHeader icon={<GlobeIcon />} label="Country" />
+      <p className="field-hint" style={{ marginBottom: 16 }}>
+        {geoGuess ? 'Auto-detected from your location — confirm or change it. ' : ''}
+        You can only set this once — double-check before saving, it can't be changed afterward.
+      </p>
+      <div className="field-group">
+        <CountrySelect value={country} onChange={setCountry} />
+      </div>
+      <button
+        type="button"
+        className={`btn-fill ${busy ? 'btn-loading' : ''}`}
+        style={{ marginTop: 16 }}
+        onClick={handleSave}
+        disabled={busy}
+      >
+        {busy ? <><Spinner /> Saving…</> : 'Save Country'}
+      </button>
+    </div>
+  );
+}
+
 function SocialHandlesCard() {
   const toast = useToast();
   const { user, refetch } = useSession();
@@ -201,34 +323,27 @@ function SocialHandlesCard() {
 
   if (!editing) {
     return (
-      <div className="register-card register-card-full">
-        <div className="register-card-header">
-          <span>Social Handles</span>
-          <button type="button" className="btn-ghost" style={{ marginLeft: 'auto' }} onClick={() => setEditing(true)}>
-            Edit
-          </button>
-        </div>
-        <div className="wallet-info">
-          <div className="wallet-info-row">
-            <span className="result-row-label social-row-label"><DiscordIcon /> DISCORD</span>
-            <span className="result-row-value result-mono">
-              {user.discordUsername || <span style={{ opacity: 0.5 }}>Not set</span>}
-            </span>
-          </div>
-          <div className="wallet-info-row">
-            <span className="result-row-label social-row-label"><XIcon /> X</span>
-            <span className="result-row-value result-mono">
-              {user.xUsername || <span style={{ opacity: 0.5 }}>Not set</span>}
-            </span>
-          </div>
+      <div className="profile-section">
+        <SectionHeader
+          icon={<AtIcon />}
+          label="Social Handles"
+          action={<button type="button" className="btn-ghost btn-ghost-sm" onClick={() => setEditing(true)}>Edit</button>}
+        />
+        <div className="profile-value-row">
+          <span className="profile-value-pill profile-value-pill-icon">
+            <DiscordIcon /> {user.discordUsername || <span style={{ opacity: 0.5 }}>Not set</span>}
+          </span>
+          <span className="profile-value-pill profile-value-pill-icon">
+            <XIcon /> {user.xUsername || <span style={{ opacity: 0.5 }}>Not set</span>}
+          </span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="register-card register-card-full">
-      <div className="register-card-header"><span>Social Handles</span></div>
+    <div className="profile-section">
+      <SectionHeader icon={<AtIcon />} label="Social Handles" />
       <p className="field-hint" style={{ marginBottom: 16 }}>
         Optional — Discord and X usernames can be added or changed anytime.
       </p>
@@ -283,6 +398,7 @@ export default function ProfileDetailsCard() {
   return (
     <>
       <NameCard />
+      <CountryCard />
       <SocialHandlesCard />
     </>
   );

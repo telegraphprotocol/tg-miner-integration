@@ -5,9 +5,10 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
 import { decodeEventLog } from 'viem';
+import { usePathname } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
-import AuthModal from './AuthModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { useSession } from '../hooks/useSession';
@@ -49,9 +50,10 @@ interface Props {
 export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack, editRecord }: Props) {
   const isEdit = !!editRecord;
   const toast = useToast();
+  const router = useRouter();
+  const pathname = usePathname();
   const { address, isConnected, chain } = useAccount();
-  const { user, isLoading: sessionLoading, refetch: refetchSession } = useSession();
-  const [showAuth, setShowAuth] = useState(false);
+  const { user, isLoading: sessionLoading } = useSession();
 
   // Editing only ever works from known existing values — there's no fresh YAML to auto-hash — so it's always 'manual'.
   const [mode, setMode] = useState<Mode>(isEdit ? 'manual' : (pinataResult ? 'auto' : 'manual'));
@@ -110,7 +112,10 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const isReverted   = isConfirmed && receipt?.status !== 'success';
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
-  const canSubmit    = isConnected && !wrongNetwork && !!user && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+  // Registering must use the wallet linked to the signed-in account — one wallet per
+  // account, so a connected-but-different wallet can't submit on someone else's behalf.
+  const walletLinkedHere = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() === address.toLowerCase();
+  const canSubmit    = isConnected && !wrongNetwork && !!user && walletLinkedHere && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
@@ -313,22 +318,27 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               {!sessionLoading && !user && (
                 <div className="wallet-disconnected" style={{ marginTop: 12 }}>
                   <p className="wallet-disconnected-text">{isEdit ? 'Sign in to edit your registration.' : 'Sign in to register a miner.'}</p>
-                  <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => setShowAuth(true)}>
+                  <button
+                    type="button"
+                    className="wallet-pill wallet-pill-accent"
+                    onClick={() => router.push(`/login?tab=login&next=${encodeURIComponent(pathname)}`)}
+                  >
                     Login
                   </button>
+                </div>
+              )}
+              {!sessionLoading && user && !walletLinkedHere && (
+                <div className="wallet-disconnected" style={{ marginTop: 12 }}>
+                  <p className="wallet-disconnected-text">
+                    {user.walletAddress
+                      ? `Connect the wallet linked to your account (${user.walletAddress}) to register.`
+                      : 'Link a wallet to your account to register.'}
+                  </p>
                 </div>
               )}
             </div>
           )}
         </div>
-
-        {showAuth && (
-          <AuthModal
-            defaultTab="login"
-            onClose={() => setShowAuth(false)}
-            onAuthed={() => { setShowAuth(false); refetchSession(); }}
-          />
-        )}
 
         {/* Hash source */}
         <div className="register-card">

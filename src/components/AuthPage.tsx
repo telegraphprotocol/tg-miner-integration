@@ -1,18 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useRouter } from 'nextjs-toploader/app';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
+import AppBackground from './AppBackground';
+import CountrySelect from './CountrySelect';
+import { useSession } from '../hooks/useSession';
+import { useGeoCountryGuess } from '../hooks/useGeoCountryGuess';
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordRules';
 import { fireSignupConversion } from '../lib/xPixel';
-
-interface Props {
-  onClose: () => void;
-  onAuthed: () => void;
-  /** 'dropdown' anchors under the trigger (e.g. the navbar Login button) instead of a full-screen centered modal. */
-  variant?: 'modal' | 'dropdown';
-  defaultTab?: Tab;
-}
 
 type Tab = 'signup' | 'login';
 type SignupPhase = 'email' | 'code';
@@ -31,20 +29,19 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
-export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaultTab = 'signup' }: Props) {
+export default function AuthPage() {
   const toast = useToast();
-  const [tab, setTab] = useState<Tab>(defaultTab);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { refetch: refetchSession } = useSession();
+  const searchParams = useSearchParams();
 
-  useEffect(() => {
-    if (variant !== 'dropdown') return;
-    const onClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) onClose();
-    };
-    document.addEventListener('mousedown', onClickOutside);
-    return () => document.removeEventListener('mousedown', onClickOutside);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variant]);
+  const initialTab: Tab = searchParams.get('tab') === 'signup' ? 'signup' : 'login';
+  const reason = searchParams.get('reason');
+  const next = searchParams.get('next');
+
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  const goNext = () => router.push(next ? decodeURIComponent(next) : '/');
 
   // Signup state
   const [signupPhase, setSignupPhase] = useState<SignupPhase>('email');
@@ -53,8 +50,15 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
   const [otp, setOtp] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [signupCountry, setSignupCountry] = useState('');
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupError, setSignupError] = useState('');
+
+  const geoGuess = useGeoCountryGuess();
+  useEffect(() => {
+    if (geoGuess && !signupCountry) setSignupCountry(geoGuess);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geoGuess]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -100,6 +104,7 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
   const handleVerifyOtp = async () => {
     setSignupError('');
     if (!otp.trim() || !signupPassword) { setSignupError('Enter the code and a password.'); return; }
+    if (!signupCountry) { setSignupError('Select your country.'); return; }
     const passwordError = validatePasswordStrength(signupPassword);
     if (passwordError) { setSignupError(passwordError); return; }
     setSignupBusy(true);
@@ -107,13 +112,14 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
       const res = await fetch('/api/auth/signup/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: signupToken, otp: otp.trim(), password: signupPassword }),
+        body: JSON.stringify({ token: signupToken, otp: otp.trim(), password: signupPassword, country: signupCountry }),
       });
       const data = await res.json();
       if (!res.ok) { setSignupError(data.error || 'Could not verify code.'); return; }
       toast.success('Account created.');
       fireSignupConversion();
-      onAuthed();
+      refetchSession();
+      goNext();
     } catch {
       setSignupError('Network error. Please try again.');
     } finally {
@@ -134,7 +140,8 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
       const data = await res.json();
       if (!res.ok) { setLoginError(data.error || 'Could not sign in.'); return; }
       toast.success('Signed in.');
-      onAuthed();
+      refetchSession();
+      goNext();
     } catch {
       setLoginError('Network error. Please try again.');
     } finally {
@@ -220,8 +227,15 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
     }
   };
 
-  const panel = (
-    <div className={`modal-panel modal-auth ${variant === 'dropdown' ? 'auth-dropdown-panel' : ''}`} ref={panelRef}>
+  return (
+    <div className="auth-page">
+      <AppBackground />
+      <button type="button" className="auth-page-logo" onClick={() => router.push('/')}>
+        <img src="/logo.png" alt="Telegraph" className="lv2-logo-img" />
+        <span className="lv2-logo-text">TELEGRAPH</span>
+      </button>
+
+      <div className="auth-page-panel modal-panel modal-auth">
         <div className="modal-header">
           <div className="modal-header-left">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -230,12 +244,9 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
             </svg>
             <span>{tab === 'signup' ? 'Create Account' : 'Sign In'}</span>
           </div>
-          <button type="button" className="modal-close" onClick={onClose}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
         </div>
+
+        {reason && <p className="required-profile-banner">{reason}</p>}
 
         <div className="sub-tabs" style={{ marginBottom: 20 }}>
           <button
@@ -313,6 +324,12 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
                   </button>
                 </div>
                 <p className="field-hint" style={{ marginTop: 4 }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
+                <label className="field-label" style={{ marginTop: 12 }}>Country <span className="field-required">*</span></label>
+                <CountrySelect value={signupCountry} onChange={setSignupCountry} />
+                <p className="field-hint" style={{ marginTop: 4 }}>
+                  {geoGuess ? 'Auto-detected from your location — confirm or change it. ' : ''}
+                  Required — cannot be changed after your account is created.
+                </p>
                 {signupError && <p className="field-error">{signupError}</p>}
                 <button
                   type="button"
@@ -477,14 +494,7 @@ export default function AuthModal({ onClose, onAuthed, variant = 'modal', defaul
             </div>
           </div>
         )}
-    </div>
-  );
-
-  if (variant === 'dropdown') return panel;
-
-  return (
-    <div className="modal-bd" onClick={e => e.target === e.currentTarget && onClose()}>
-      {panel}
+      </div>
     </div>
   );
 }

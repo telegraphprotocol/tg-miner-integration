@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     email: user.email,
     walletAddress: user.walletAddress,
-    walletUnlinkCooldownUntil: user.walletUnlinkCooldownUntil,
+    country: user.country,
     firstName: user.firstName,
     lastName: user.lastName,
     discordUsername: user.discordUsername,
