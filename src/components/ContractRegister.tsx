@@ -78,7 +78,13 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
   const effectiveHash    = mode === 'auto' ? autoHash : (manualHash.startsWith('0x') ? manualHash : `0x${manualHash}`);
   const effectiveUrl     = mode === 'auto' ? (pinataResult?.gateway ?? '') : manualUrl;
-  const effectiveIntents = mode === 'auto' ? intents : manualIntents.split(',').map(s => s.trim()).filter(Boolean);
+  // Manual entry must match the same canonical form (UPPER_SNAKE_CASE) the on-chain
+  // registry and the wizard's own intent picker use — otherwise the contract call
+  // reverts with "intent not registered onchain" for a mismatched entry anywhere in
+  // the array, which can look like it's about a completely different, valid intent.
+  const effectiveIntents = mode === 'auto'
+    ? intents
+    : manualIntents.split(',').map(s => s.trim().toUpperCase().replace(/\s+/g, '_')).filter(Boolean);
 
   // validation
   const priceRaw = BigInt(Math.round(parseFloat(minPrice || '0') * 1_000_000));
