@@ -21,10 +21,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Nonce expired or missing. Please request a new one.' }, { status: 400 });
     }
 
-    if (user.walletAddress && user.walletAddress.toLowerCase() !== String(address).toLowerCase()) {
-      return NextResponse.json({ error: 'This account already has a linked wallet.' }, { status: 409 });
-    }
-
     const message = buildWalletLinkMessage({ address, nonce: user.walletNonce, issuedAt: user.walletNonceIssuedAt });
 
     const recovered = await recoverMessageAddress({ message, signature });
@@ -34,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedAddress = String(address).toLowerCase();
     const linkedElsewhere = await users.findOne({
-      walletAddress: normalizedAddress,
+      $or: [{ walletAddress: normalizedAddress }, { walletAddresses: normalizedAddress }],
       email: { $ne: sessionUser.email },
     });
     if (linkedElsewhere) {
@@ -43,7 +39,10 @@ export async function POST(req: NextRequest) {
 
     await users.updateOne(
       { email: sessionUser.email },
-      { $set: { walletAddress: normalizedAddress, walletNonce: null, walletNonceIssuedAt: null, walletNonceExpiresAt: null } },
+      {
+        $addToSet: { walletAddresses: normalizedAddress },
+        $set: { walletNonce: null, walletNonceIssuedAt: null, walletNonceExpiresAt: null },
+      },
     );
 
     return NextResponse.json({ ok: true, walletAddress: normalizedAddress });

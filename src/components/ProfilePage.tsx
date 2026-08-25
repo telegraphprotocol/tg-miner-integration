@@ -39,9 +39,9 @@ export default function ProfilePage() {
                   {user.country && (
                     <span className="profile-chip"><CountryFlag code={user.country} /> {countryName(user.country)}</span>
                   )}
-                  <span className={`profile-chip ${user.walletAddress ? 'profile-chip-on' : ''}`}>
-                    <span className={`profile-status-dot ${user.walletAddress ? 'profile-status-dot-on' : ''}`} />
-                    {user.walletAddress ? 'Wallet Linked' : 'No Wallet Linked'}
+                  <span className={`profile-chip ${user.walletAddresses?.length ? 'profile-chip-on' : ''}`}>
+                    <span className={`profile-status-dot ${user.walletAddresses?.length ? 'profile-status-dot-on' : ''}`} />
+                    {user.walletAddresses?.length ? 'Wallet Linked' : 'No Wallet Linked'}
                   </span>
                 </div>
               </div>

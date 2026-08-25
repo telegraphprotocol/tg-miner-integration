@@ -40,10 +40,10 @@ export interface UserDoc {
   _id?: ObjectId;
   email: string;
   passwordHash: string;
-  /** Omitted entirely (not set to null) when unlinked — the unique index is sparse,
-   *  which only excludes documents missing the field, not documents with value null.
-   *  Wallets can no longer be unlinked once set — one wallet per account, permanently. */
+  /** @deprecated legacy single-wallet field, kept for accounts linked before multi-wallet support. */
   walletAddress?: string | null;
+  /** Lowercased addresses linked to this account. Any number may be linked; not mandatory. */
+  walletAddresses?: string[];
   walletNonce: string | null;
   walletNonceIssuedAt: string | null;
   walletNonceExpiresAt: Date | null;
@@ -72,6 +72,7 @@ export async function getUsersCollection() {
     await Promise.all([
       col.createIndex({ email: 1 }, { unique: true }),
       col.createIndex({ walletAddress: 1 }, { unique: true, sparse: true }),
+      col.createIndex({ walletAddresses: 1 }, { unique: true, sparse: true }),
     ]).catch(err => {
       indexesEnsured = false;
       throw err;

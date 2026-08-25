@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   }
 
   const users = await getUsersCollection();
-  const user = await users.findOne({ walletAddress: address.toLowerCase() });
+  const normalizedAddress = address.toLowerCase();
+  const user = await users.findOne({ $or: [{ walletAddress: normalizedAddress }, { walletAddresses: normalizedAddress }] });
 
   return NextResponse.json({ country: user?.country ?? 'Global' });
 }

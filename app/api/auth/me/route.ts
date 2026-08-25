@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   }
   return NextResponse.json({
     email: user.email,
-    walletAddress: user.walletAddress,
+    walletAddresses: user.walletAddresses,
     country: user.country,
     firstName: user.firstName,
     lastName: user.lastName,

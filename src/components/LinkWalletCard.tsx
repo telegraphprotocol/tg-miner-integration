@@ -25,9 +25,9 @@ export default function LinkWalletCard() {
 
   if (!user) return null;
 
-  const hasLinkedWallet = !!user.walletAddress;
-  const alreadyLinkedHere = hasLinkedWallet && !!address && user.walletAddress?.toLowerCase() === address.toLowerCase();
-  const connectedDiffersFromLinked = hasLinkedWallet && !!address && user.walletAddress?.toLowerCase() !== address.toLowerCase();
+  const linkedWallets = user.walletAddresses ?? [];
+  const hasLinkedWallet = linkedWallets.length > 0;
+  const connectedAlreadyLinked = !!address && linkedWallets.some(w => w.toLowerCase() === address.toLowerCase());
 
   const handleLink = async () => {
     if (!address) return;
@@ -60,36 +60,33 @@ export default function LinkWalletCard() {
     <div className="profile-section link-wallet-card">
       <div className="profile-section-header">
         <span className="profile-section-icon"><WalletIcon /></span>
-        <span className="profile-section-label">Account Wallet</span>
+        <span className="profile-section-label">Account Wallets</span>
         {hasLinkedWallet && (
           <span className="profile-section-action">
-            <span className={`profile-status-dot ${alreadyLinkedHere ? 'profile-status-dot-on' : ''}`} />
-            {alreadyLinkedHere ? 'Linked' : 'Linked · Not Connected'}
+            <span className={`profile-status-dot ${connectedAlreadyLinked ? 'profile-status-dot-on' : ''}`} />
+            {linkedWallets.length} linked
           </span>
         )}
       </div>
 
       {hasLinkedWallet && (
         <>
-          <div className="profile-value-pill profile-value-pill-icon link-wallet-address-pill">
-            <span className="result-mono">{address ? `${address.slice(0, 6)}...${address.slice(-4)}` : `${user.walletAddress!.slice(0, 6)}...${user.walletAddress!.slice(-4)}`}</span>
-          </div>
+          {linkedWallets.map(w => (
+            <div key={w} className="profile-value-pill profile-value-pill-icon link-wallet-address-pill">
+              <span className="result-mono">{w.slice(0, 6)}...{w.slice(-4)}</span>
+            </div>
+          ))}
           <p className="field-hint link-wallet-note">
-            {alreadyLinkedHere
-              ? `Linked to ${user.email}. Only this wallet can submit registrations for your account.`
-              : connectedDiffersFromLinked
-                ? 'Connect this wallet above to use it for registration.'
-                : `Linked to ${user.email}. Connect it above to use it for registration.`}
-            {' '}Wallets are linked permanently and cannot be delinked.
+            Linked to {user.email}. Any linked wallet can be connected above to use it for registration.
           </p>
         </>
       )}
 
-      {!hasLinkedWallet && !isConnected && (
-        <p className="field-hint link-wallet-note">Connect your wallet above to link it to {user.email}.</p>
+      {!isConnected && (
+        <p className="field-hint link-wallet-note">Connect a wallet above to link it to {user.email}.</p>
       )}
 
-      {!hasLinkedWallet && isConnected && (
+      {isConnected && !connectedAlreadyLinked && (
         <>
           <div className="profile-value-pill profile-value-pill-icon link-wallet-address-pill">
             <span className="result-mono">{address}</span>

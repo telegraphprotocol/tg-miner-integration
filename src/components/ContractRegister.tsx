@@ -58,13 +58,13 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   // Editing only ever works from known existing values — there's no fresh YAML to auto-hash — so it's always 'manual'.
   const [mode, setMode] = useState<Mode>(isEdit ? 'manual' : (pinataResult ? 'auto' : 'manual'));
   const [feeAddress, setFeeAddress]   = useState(editRecord?.FeeAddress ?? '');
-  const [minPrice, setMinPrice]       = useState(editRecord ? (editRecord.MinPriceUsdc / 1_000_000).toString() : (minPriceUsdc || '0.01'));
+  const [minPrice, setMinPrice]       = useState(editRecord ? ((editRecord.MinPriceUsdc ?? 0) / 1_000_000).toString() : (minPriceUsdc || '0.01'));
   const [autoHash, setAutoHash]       = useState<`0x${string}` | ''>('');
 
   // manual-mode fields
   const [manualHash, setManualHash]       = useState(editRecord?.YamlHash ?? '');
   const [manualUrl, setManualUrl]         = useState(editRecord?.YamlURL ?? '');
-  const [manualIntents, setManualIntents] = useState(editRecord ? editRecord.SupportedIntents.join(', ') : intents.join(', '));
+  const [manualIntents, setManualIntents] = useState(editRecord ? (editRecord.SupportedIntents ?? []).join(', ') : intents.join(', '));
 
   const [showInfo, setShowInfo]         = useState(false);
   const [showHashModal, setShowHashModal] = useState(false);
@@ -112,9 +112,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const isReverted   = isConfirmed && receipt?.status !== 'success';
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
-  // Registering must use the wallet linked to the signed-in account — one wallet per
-  // account, so a connected-but-different wallet can't submit on someone else's behalf.
-  const walletLinkedHere = !!user?.walletAddress && !!address && user.walletAddress.toLowerCase() === address.toLowerCase();
+  // Registering must use a wallet linked to the signed-in account — a connected wallet
+  // that isn't linked to any account can't submit on someone else's behalf.
+  const walletLinkedHere = !!address && !!(user?.walletAddresses ?? []).some(w => w.toLowerCase() === address.toLowerCase());
   const canSubmit    = isConnected && !wrongNetwork && !!user && walletLinkedHere && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
@@ -330,8 +330,8 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               {!sessionLoading && user && !walletLinkedHere && (
                 <div className="wallet-disconnected" style={{ marginTop: 12 }}>
                   <p className="wallet-disconnected-text">
-                    {user.walletAddress
-                      ? `Connect the wallet linked to your account (${user.walletAddress}) to register.`
+                    {user.walletAddresses?.length
+                      ? 'Connect one of your linked wallets to register.'
                       : 'Link a wallet to your account to register.'}
                   </p>
                 </div>

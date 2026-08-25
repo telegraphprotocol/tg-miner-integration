@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 export interface SessionUser {
   email: string;
-  walletAddress: string | null;
+  walletAddresses: string[];
   country: string | null;
   firstName: string | null;
   lastName: string | null;

@@ -64,7 +64,7 @@ export async function resetLoginLockout(email: string): Promise<void> {
 export interface AuthedUser {
   id: string;
   email: string;
-  walletAddress: string | null;
+  walletAddresses: string[];
   /** ISO 3166-1 alpha-2 code, e.g. "US". Null until the user completes the mandatory profile step. */
   country: string | null;
   firstName: string | null;
@@ -91,7 +91,7 @@ export async function getSessionUser(req: NextRequest): Promise<AuthedUser | nul
   return {
     id: user._id!.toString(),
     email: user.email,
-    walletAddress: user.walletAddress ?? null,
+    walletAddresses: user.walletAddresses?.length ? user.walletAddresses : (user.walletAddress ? [user.walletAddress] : []),
     country: user.country ?? null,
     firstName: user.firstName ?? null,
     lastName: user.lastName ?? null,
