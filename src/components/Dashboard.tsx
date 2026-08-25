@@ -49,23 +49,48 @@ function WasmRow({ record, onDeregistered }: {
   onDeregistered: () => void;
 }) {
   const toast = useToast();
+  const [confirming, setConfirming] = useState(false);
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
+
+  const isSuccess = isConfirmed && receipt?.status === 'success';
+  const isReverted = isConfirmed && receipt?.status !== 'success';
 
   useEffect(() => {
     if (isSuccess) {
       toast.success('WASM entry deregistered.');
       onDeregistered();
+    } else if (isReverted) {
+      reset();
+      toast.error('Transaction reverted on-chain. No changes were made — check BaseScan for details.');
     }
-  }, [isSuccess, toast, onDeregistered]);
+  }, [isSuccess, isReverted, toast, onDeregistered, reset]);
 
   useEffect(() => {
     if (error) toast.error(friendlyRevertMessage(error.message ?? 'Transaction failed.'));
   }, [error, toast]);
 
+  useEffect(() => {
+    if (!confirming) return;
+    const t = setTimeout(() => setConfirming(false), 4000);
+    return () => clearTimeout(t);
+  }, [confirming]);
+
   const status = record.ActivationStatus;
   const inFlight = isPending || isConfirming;
   const deregisterable = status !== 'deregistered';
+
+  const handleDeregisterClick = () => {
+    if (!confirming) { setConfirming(true); return; }
+    setConfirming(false);
+    reset();
+    writeContract({
+      address: DIAMOND_ADDRESS,
+      abi: intentRegistryAbi,
+      functionName: 'deregisterEntity',
+      args: [BigInt(record.RegistrationID), ENTITY_WASM_AUTHOR],
+    });
+  };
 
   return (
     <div className="reg-row">
@@ -86,26 +111,14 @@ function WasmRow({ record, onDeregistered }: {
         )}
       </div>
       <div className="reg-row-actions">
-        <button type="button" className="btn-ghost" disabled title="Coming soon">
-          Edit
-        </button>
         {deregisterable && (
           <button
             type="button"
             className={`btn-ghost reg-danger ${inFlight ? 'btn-loading' : ''}`}
-            disabled
-            title="Deregistration is temporarily disabled"
-            onClick={() => {
-              reset();
-              writeContract({
-                address: DIAMOND_ADDRESS,
-                abi: intentRegistryAbi,
-                functionName: 'deregisterEntity',
-                args: [BigInt(record.RegistrationID), ENTITY_WASM_AUTHOR],
-              });
-            }}
+            disabled={inFlight}
+            onClick={handleDeregisterClick}
           >
-            {inFlight ? <><Spinner /> Deregistering…</> : 'Deregister'}
+            {inFlight ? <><Spinner /> Deregistering…</> : confirming ? 'Confirm Deregister?' : 'Deregister'}
           </button>
         )}
       </div>

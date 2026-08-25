@@ -46,9 +46,11 @@ html { scroll-behavior: smooth; }
   opacity: 0.55;
 }
 
-/* Ensure all app content sits above the background */
-.app > *:not(.app-bg),
-.lv2 > *:not(.app-bg) { position: relative; z-index: 1; }
+/* Ensure all app content sits above the background — excluding modal overlays
+   (e.g. ImportModal's .modal-bd), which are direct children of .app in some
+   flows and must keep their own position:fixed/z-index:1000 to cover the screen. */
+.app > *:not(.app-bg):not(.modal-bd),
+.lv2 > *:not(.app-bg):not(.modal-bd) { position: relative; z-index: 1; }
 
 /* ── Custom Scrollbars ─────────────────────────── */
 ::-webkit-scrollbar {

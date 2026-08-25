@@ -46,7 +46,7 @@ export default function RegisterWizard() {
       <Header step={step} onBack={step === 1 ? () => router.push('/') : undefined} />
 
       <div className="app-body">
-        {step === 1 && (
+        {step === 1 && !showImport && (
           <YamlWizard state={form} onChange={handleChange} onNext={() => setStep(2)} />
         )}
         {step === 2 && (
