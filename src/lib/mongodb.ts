@@ -1,4 +1,4 @@
-import { MongoClient, Db, ObjectId } from 'mongodb';
+import { MongoClient, Db, ObjectId, type Collection, type CreateIndexesOptions, type Document, type IndexSpecification } from 'mongodb';
 
 const dbName = process.env.MONGODB_DB ?? 'telegraph_register_miner';
 
@@ -62,6 +62,24 @@ export interface UserDoc {
   loginLockedUntil: Date | null;
 }
 
+/**
+ * createIndex, but if an index with the same auto-generated name already exists with
+ * different options (code 85/86 — e.g. we changed an index's shape, like sparse -> partial,
+ * across a deploy), drop the stale index and recreate it instead of failing forever.
+ */
+async function ensureIndex<T extends Document>(col: Collection<T>, spec: IndexSpecification, options: CreateIndexesOptions) {
+  try {
+    await col.createIndex(spec, options);
+  } catch (err) {
+    const code = (err as { code?: number }).code;
+    if (code !== 85 && code !== 86) throw err;
+    const existing = await col.indexes();
+    const stale = existing.find(i => i.key && JSON.stringify(i.key) === JSON.stringify(spec));
+    if (stale?.name) await col.dropIndex(stale.name).catch(() => {}); // already gone if another process won the race
+    await col.createIndex(spec, options);
+  }
+}
+
 let indexesEnsured = false;
 
 export async function getUsersCollection() {
@@ -70,15 +88,16 @@ export async function getUsersCollection() {
   if (!indexesEnsured) {
     indexesEnsured = true;
     await Promise.all([
-      col.createIndex({ email: 1 }, { unique: true }),
-      col.createIndex({ walletAddress: 1 }, { unique: true, sparse: true }),
+      ensureIndex(col, { email: 1 }, { unique: true }),
+      ensureIndex(col, { walletAddress: 1 }, { unique: true, sparse: true }),
       // Partial (not sparse) index: a sparse index only excludes documents missing the
       // field entirely, but every user has walletAddresses present (defaults to []) — an
       // empty array still gets one index entry (as `undefined`) under a sparse index,
       // so every zero-wallet account would collide on that single slot. Filtering on
       // 'walletAddresses.0' existing (the only array-emptiness check partialFilterExpression
       // supports) correctly indexes only accounts with at least one linked wallet.
-      col.createIndex(
+      ensureIndex(
+        col,
         { walletAddresses: 1 },
         { unique: true, partialFilterExpression: { 'walletAddresses.0': { $exists: true } } },
       ),
