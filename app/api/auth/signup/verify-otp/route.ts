@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
     const result = await users.insertOne({
       email,
       passwordHash,
-      walletAddresses: [],
       walletNonce: null,
       walletNonceIssuedAt: null,
       walletNonceExpiresAt: null,
