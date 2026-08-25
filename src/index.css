@@ -47,10 +47,16 @@ html { scroll-behavior: smooth; }
 }
 
 /* Ensure all app content sits above the background — excluding modal overlays
-   (e.g. ImportModal's .modal-bd), which are direct children of .app in some
-   flows and must keep their own position:fixed/z-index:1000 to cover the screen. */
-.app > *:not(.app-bg):not(.modal-bd),
-.lv2 > *:not(.app-bg):not(.modal-bd) { position: relative; z-index: 1; }
+   (e.g. ImportModal's .modal-bd) and the nav headers (.app-header, .lv2-nav),
+   which are direct children of .app/.lv2 and must keep their own higher z-index
+   (position:fixed/z-index:1000 for modals to cover the screen; z-index:200/60
+   for the headers so their account/wallet dropdowns aren't painted behind the
+   body content below them, which is a same-z-index sibling that would otherwise
+   win by being later in DOM order). This selector's own specificity (multiple
+   :not() classes) is higher than a plain ".app > .app-header" rule, so without
+   these exclusions it silently overrides those elements' own z-index values. */
+.app > *:not(.app-bg):not(.modal-bd):not(.app-header),
+.lv2 > *:not(.app-bg):not(.modal-bd):not(.lv2-nav) { position: relative; z-index: 1; }
 
 /* ── Custom Scrollbars ─────────────────────────── */
 ::-webkit-scrollbar {
