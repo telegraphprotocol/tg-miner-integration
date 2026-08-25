@@ -72,7 +72,16 @@ export async function getUsersCollection() {
     await Promise.all([
       col.createIndex({ email: 1 }, { unique: true }),
       col.createIndex({ walletAddress: 1 }, { unique: true, sparse: true }),
-      col.createIndex({ walletAddresses: 1 }, { unique: true, sparse: true }),
+      // Partial (not sparse) index: a sparse index only excludes documents missing the
+      // field entirely, but every user has walletAddresses present (defaults to []) — an
+      // empty array still gets one index entry (as `undefined`) under a sparse index,
+      // so every zero-wallet account would collide on that single slot. Filtering on
+      // 'walletAddresses.0' existing (the only array-emptiness check partialFilterExpression
+      // supports) correctly indexes only accounts with at least one linked wallet.
+      col.createIndex(
+        { walletAddresses: 1 },
+        { unique: true, partialFilterExpression: { 'walletAddresses.0': { $exists: true } } },
+      ),
     ]).catch(err => {
       indexesEnsured = false;
       throw err;
