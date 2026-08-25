@@ -65,9 +65,34 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const [manualHash, setManualHash]       = useState(editRecord?.YamlHash ?? '');
   const [manualUrl, setManualUrl]         = useState(editRecord?.YamlURL ?? '');
   const [manualIntents, setManualIntents] = useState(editRecord ? (editRecord.SupportedIntents ?? []).join(', ') : intents.join(', '));
+  // The URL the current manualHash was generated for — used to detect a stale hash after the URL changes.
+  const [hashSourceUrl, setHashSourceUrl] = useState(editRecord?.YamlURL ?? '');
+  const hashIsStale = manualUrl !== '' && manualUrl !== hashSourceUrl;
 
   const [showInfo, setShowInfo]         = useState(false);
   const [showHashModal, setShowHashModal] = useState(false);
+  const [fetchingHash, setFetchingHash] = useState(false);
+
+  const handleFetchHashFromUrl = async () => {
+    if (!manualUrl) return;
+    setFetchingHash(true);
+    try {
+      const res = await fetch('/api/yaml-hash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: manualUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Could not fetch hash from that URL.'); return; }
+      setManualHash(data.hash);
+      setHashSourceUrl(manualUrl);
+      toast.success('Hash regenerated from URL.');
+    } catch {
+      toast.error('Network error fetching that URL.');
+    } finally {
+      setFetchingHash(false);
+    }
+  };
 
   useEffect(() => {
     if (address && !feeAddress) setFeeAddress(address);
@@ -387,6 +412,20 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   onChange={e => setManualUrl(e.target.value)}
                   disabled={isTxInFlight || isSuccess}
                 />
+                {hashIsStale && (
+                  <p className="field-hint" style={{ marginTop: 6, color: 'rgba(255,180,80,0.9)' }}>
+                    URL changed — the hash below no longer matches it.{' '}
+                    <button
+                      type="button"
+                      className="btn-hash-gen"
+                      style={{ display: 'inline-flex', marginLeft: 4 }}
+                      onClick={handleFetchHashFromUrl}
+                      disabled={isTxInFlight || isSuccess || fetchingHash}
+                    >
+                      {fetchingHash ? 'Regenerating…' : 'Regenerate hash from URL'}
+                    </button>
+                  </p>
+                )}
               </div>
               <div className="field-group">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -617,7 +656,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
 
       {showHashModal && (
         <YamlHashModal
-          onApply={h => setManualHash(h)}
+          onApply={h => { setManualHash(h); setHashSourceUrl(manualUrl); }}
           onClose={() => setShowHashModal(false)}
         />
       )}
