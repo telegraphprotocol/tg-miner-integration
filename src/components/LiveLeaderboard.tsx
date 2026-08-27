@@ -13,6 +13,7 @@ interface Props {
 
 const AUTO_REFRESH_MS = 15000;
 const FLASH_MS = 2000;
+const OVERALL_VALUE = '__overall__';
 
 function rankClass(rank: number): string {
   if (rank === 1) return 'lb-rank-1';
@@ -34,11 +35,30 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
 
   useEffect(() => {
     if (!intentFilter && intentOptions.length > 0) {
-      setIntentFilter(intentOptions[0]);
+      setIntentFilter(OVERALL_VALUE);
     }
   }, [intentFilter, intentOptions]);
 
-  const activeRows = byIntent[intentFilter] ?? [];
+  const isOverall = intentFilter === OVERALL_VALUE;
+
+  // For each intent, the #1-ranked miner. Grouped by miner so a miner topping
+  // several intents shows up once with all of them listed, rather than once
+  // per intent.
+  const overallRows = useMemo(() => {
+    const intentsByMiner = new Map<string, string[]>();
+    for (const [intentId, rows] of Object.entries(byIntent)) {
+      const top = rows.find(r => r.rank === 1);
+      if (!top) continue;
+      const list = intentsByMiner.get(top.miner_slug) ?? [];
+      list.push(intentId);
+      intentsByMiner.set(top.miner_slug, list);
+    }
+    return [...intentsByMiner.entries()]
+      .map(([miner_slug, intentIds]) => ({ miner_slug, intentIds: intentIds.sort() }))
+      .sort((a, b) => b.intentIds.length - a.intentIds.length || a.miner_slug.localeCompare(b.miner_slug));
+  }, [byIntent]);
+
+  const activeRows = isOverall ? [] : byIntent[intentFilter] ?? [];
 
   // Auto-refresh so the leaderboard visibly feels live, not a static snapshot.
   useEffect(() => {
@@ -48,7 +68,7 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
 
   // Flag rows whose rank changed since the last fetch for a brief highlight.
   useEffect(() => {
-    if (activeRows.length === 0) return;
+    if (isOverall || activeRows.length === 0) return;
     const current = new Map(activeRows.map(e => [e.miner_slug, e.rank ?? 0]));
     const prev = prevRanksRef.current;
     if (prev) {
@@ -89,6 +109,7 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
                 value={intentFilter}
                 onChange={e => setIntentFilter(e.target.value)}
               >
+                <option value={OVERALL_VALUE}>OVERALL (TOP PER INTENT)</option>
                 {intentOptions.map(id => (
                   <option key={id} value={id}>{id.replace(/_/g, ' ')}</option>
                 ))}
@@ -118,8 +139,41 @@ export default function LiveLeaderboard({ limit = 10, className, onGetRanked }: 
 
       {error ? (
         <p className="field-error">Could not reach the registry node. {error.message}</p>
-      ) : isLoading && activeRows.length === 0 ? (
+      ) : isLoading && intentOptions.length === 0 ? (
         <p className="field-hint"><Spinner /> Loading leaderboard…</p>
+      ) : isOverall ? (
+        overallRows.length === 0 ? (
+          <p className="field-hint">No top-ranked miners yet.</p>
+        ) : (
+          <div className="lb-table-wrap">
+            <table className="lb-table">
+              <colgroup>
+                <col className="lb-colw-miner" />
+                <col />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>API</th>
+                  <th>#1 In</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overallRows.map(r => (
+                  <tr key={r.miner_slug}>
+                    <td className="result-mono lb-col-miner">{r.miner_slug}</td>
+                    <td>
+                      {r.intentIds.map(id => (
+                        <span key={id} className="reg-status-badge badge-success" style={{ marginRight: 4 }}>
+                          {id.replace(/_/g, ' ')}
+                        </span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : activeRows.length === 0 ? (
         <p className="field-hint">No leaderboard data yet.</p>
       ) : (
