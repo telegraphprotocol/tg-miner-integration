@@ -229,6 +229,46 @@ function EndpointCard({ ep, idx, onChange, onRemove, onAutoInfer }: {
             </button>
           </div>
 
+          {/* ── Intents & params (required for routing, shared by both modes) ── */}
+          <div className="field-group">
+            <label className="field-label">
+              Intents <span className="field-required">*</span>
+              <Tooltip lines={[
+                'Canonical intents this endpoint serves, e.g. <strong>WEATHER_FORECAST</strong>.',
+                'At least one endpoint must declare intents or nothing can route to you.',
+              ]} />
+            </label>
+            <input
+              className="field-input field-mono"
+              placeholder="WEATHER_CHECK, WEATHER_FORECAST"
+              value={ep.intents.join(', ')}
+              onChange={e => onChange({
+                ...ep,
+                intents: e.target.value.split(',').map(v => v.trim().toUpperCase().replace(/\s+/g, '_')).filter(Boolean),
+              })}
+            />
+            <p className="field-hint">Comma-separated. Must match entries in Semantics → Supported Intents.</p>
+          </div>
+
+          <div className="field-group">
+            <label className="field-label">
+              Params (JSON)
+              <Tooltip lines={[
+                'The request contract: which parameters this endpoint takes, where they go, and which are required.',
+                'Grouped by <strong>body</strong>, <strong>query</strong>, <strong>path</strong>, <strong>header</strong>, or <strong>multipart</strong>.',
+              ]} />
+            </label>
+            <textarea
+              className="field-input field-textarea field-mono"
+              rows={6}
+              placeholder={'{\n  "query": {\n    "required": [\n      { "name": "lat", "type": "number", "intents": ["*"], "description": "Latitude, -90 to 90." }\n    ]\n  }\n}'}
+              value={ep.params_raw}
+              onChange={e => f('params_raw', e.target.value)}
+              spellCheck={false}
+            />
+            <p className="field-hint">Recommended — without it the request builder has to guess your field names.</p>
+          </div>
+
           {/* ── Auto mode ───────────────────────────── */}
           {mode === 'auto' && (
             <>
@@ -415,7 +455,7 @@ export default function EndpointsSection({ state, set }: Props) {
   const addEndpoint = () => {
     set('endpoints', [
       ...endpoints,
-      { _id: uid(), path: '', external_path: '', method: 'POST', description: '', endpoint_base_url: '', content_type: '', multipart_fields: '', param_map: [], sample_request_json: '', sample_response_json: '' },
+      { _id: uid(), path: '', external_path: '', method: 'POST', description: '', endpoint_base_url: '', content_type: '', multipart_fields: '', param_map: [], intents: [], params_raw: '', sample_request_json: '', sample_response_json: '' },
     ]);
   };
 

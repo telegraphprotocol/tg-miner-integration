@@ -94,6 +94,8 @@ export function parseYamlToForm(yamlStr: string): FormState {
         param_map: ep.param_map && typeof ep.param_map === 'object'
           ? Object.entries(ep.param_map as Record<string, string>).map(([key, value]) => ({ _id: uid(), key, value: str(value) }))
           : [],
+        intents: Array.isArray(ep.intents) ? (ep.intents as unknown[]).map(str) : [],
+        params_raw: ep.params != null ? JSON.stringify(ep.params, null, 2) : '',
         sample_request_json: '',
         sample_response_json: '',
       }))

@@ -29,6 +29,8 @@ export interface EndpointItem {
   content_type: string;
   multipart_fields: string; // comma-separated → array in YAML
   param_map: Array<{ _id: string; key: string; value: string }>;
+  intents: string[];
+  params_raw: string; // JSON text for the endpoint's `params` block (body/query/path/header/multipart)
   sample_request_json: string;
   sample_response_json: string;
 }

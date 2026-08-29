@@ -174,11 +174,20 @@ export function generateYaml(s: FormState): string {
         const desc = blockOrInline(ep.description, '    ');
         lines.push(`    description: ${desc}`);
       }
+      const epIntents = ep.intents.filter(Boolean);
+      if (epIntents.length) lines.push(`    intents: [${epIntents.join(', ')}]`);
       if (ep.endpoint_base_url) lines.push(`    endpoint_base_url: ${ep.endpoint_base_url}`);
       if (ep.content_type) lines.push(`    content_type: ${ep.content_type}`);
       if (ep.multipart_fields) {
         const fields = ep.multipart_fields.split(',').map(f => f.trim()).filter(Boolean);
         if (fields.length) lines.push(`    multipart_fields: [${fields.join(', ')}]`);
+      }
+      const paramsObj = (() => { try { return ep.params_raw.trim() ? JSON.parse(ep.params_raw) : null; } catch { return undefined; } })();
+      if (paramsObj) {
+        lines.push(`    params:`);
+        lines.push(i2(i2(i2(jsonToYaml(paramsObj)))));
+      } else if (paramsObj === undefined) {
+        lines.push(`    # params: (invalid JSON — fix before uploading)`);
       }
       if (ep.param_map.some(p => p.key)) {
         lines.push(`    param_map:`);
@@ -285,8 +294,18 @@ function jsonToYaml(obj: unknown, depth = 0): string {
   if (typeof obj === 'boolean') return obj ? 'true' : 'false';
   if (typeof obj === 'number') return String(obj);
   if (typeof obj === 'string') {
-    if (obj.includes('\n') || obj.includes(': ') || obj.startsWith('>')) return `"${obj.replace(/"/g, '\\"')}"`;
+    if (obj.includes('\n') || obj.includes(': ')) return `"${obj.replace(/"/g, '\\"')}"`;
     if (obj.length > 80) return `>\n${pad}  ${obj}`;
+    // Quote anything YAML would otherwise parse as an indicator, alias, boolean/null, or number.
+    if (
+      obj === '' ||
+      /^[*&!|>%@`"'#?,[\]{}-]/.test(obj) ||
+      /^(true|false|null|yes|no|~)$/i.test(obj) ||
+      /^-?\d+(\.\d+)?$/.test(obj) ||
+      obj !== obj.trim()
+    ) {
+      return `"${obj.replace(/"/g, '\\"')}"`;
+    }
     return obj;
   }
   if (Array.isArray(obj)) {
