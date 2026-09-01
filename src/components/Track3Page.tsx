@@ -65,6 +65,7 @@ export default function Track3Page() {
                 onClick={() => {
                   emitIntentSignal();
                   fireTrack3RegisterConversion();
+                  fetch('/api/track3/register-click', { method: 'POST' }).catch(() => {});
                   router.push('/login?tab=signup');
                 }}
               >
