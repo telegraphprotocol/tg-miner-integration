@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword, signSession, verifyToken, validatePasswordStrength, SESSION_COOKIE } from '@/lib/auth';
 import { getUsersCollection } from '@/lib/mongodb';
 import { isValidCountryCode } from '@/countries';
+import { SIGNUP_EVENT_ID } from '@/lib/xPixel';
+import { fireServerConversion } from '@/lib/xConversionsApi';
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,6 +56,13 @@ export async function POST(req: NextRequest) {
     });
 
     const session = await signSession({ userId: result.insertedId.toString(), email });
+
+    fireServerConversion({
+      eventId: SIGNUP_EVENT_ID,
+      conversionId: result.insertedId.toString(),
+      ipAddress: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim(),
+      userAgent: req.headers.get('user-agent'),
+    }).catch(err => console.error('[signup/verify-otp] conversion fire failed', err));
 
     const res = NextResponse.json({ ok: true, email });
     res.cookies.set(SESSION_COOKIE, session, {

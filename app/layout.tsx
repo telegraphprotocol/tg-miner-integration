@@ -46,15 +46,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@200;300;400;500;600;700&display=swap"
           rel="stylesheet"
         />
-      </head>
-      <body suppressHydrationWarning>
-        {/* X (Twitter) conversion tracking base pixel — event fired on successful signup, see src/lib/xPixel.ts */}
-        <Script id="x-pixel-base" strategy="afterInteractive">
+        {/* X (Twitter) conversion tracking base pixel — event fired on successful signup, see src/lib/xPixel.ts.
+            strategy="beforeInteractive" is required here: it's the only Script strategy Next.js hoists into
+            the server-rendered <head> before </head>, which is what X's install checker verifies. */}
+        <Script id="x-pixel-base" strategy="beforeInteractive">
           {`!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
 },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
 a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
 twq('config','rcv9y');`}
         </Script>
+      </head>
+      <body suppressHydrationWarning>
         <Providers>
           <GlobalProviders>{children}</GlobalProviders>
         </Providers>

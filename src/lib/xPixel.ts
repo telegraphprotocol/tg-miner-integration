@@ -4,7 +4,7 @@ declare global {
   }
 }
 
-const SIGNUP_EVENT_ID = 'tw-rcv9y-rehk0';
+export const SIGNUP_EVENT_ID = 'tw-rcv9y-rehk0';
 const TRACK3_REGISTER_EVENT_ID = 'tw-rcv9y-reqvx';
 
 /** Fires the X (Twitter) ads conversion event — call once, right after a signup actually succeeds. */
