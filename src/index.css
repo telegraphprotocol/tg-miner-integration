@@ -5059,6 +5059,40 @@ body::before {
   transform: translateY(0);
 }
 
+.lv2-hero-cta-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.lv2-hero-cta-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  padding: 12px 26px;
+  margin-top: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg);
+  font-family: 'Roboto Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.lv2-hero-cta-secondary:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
+}
+.lv2-hero-cta-secondary:active {
+  transform: translateY(0);
+}
+
 .inline-link-btn {
   background: none;
   border: none;
