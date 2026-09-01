@@ -2,6 +2,7 @@
 
 import { useRouter } from 'nextjs-toploader/app';
 import { emitIntentSignal } from '../hooks/useIntentSignal';
+import { fireTrack3RegisterConversion } from '../lib/xPixel';
 import WalletBar from './WalletBar';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
@@ -63,6 +64,7 @@ export default function Track3Page() {
                 className="lv2-hero-cta-primary"
                 onClick={() => {
                   emitIntentSignal();
+                  fireTrack3RegisterConversion();
                   router.push('/login?tab=signup');
                 }}
               >
