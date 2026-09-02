@@ -137,10 +137,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const isReverted   = isConfirmed && receipt?.status !== 'success';
   const txError      = writeError ?? receiptError;
   const isTxInFlight = isWritePending || isConfirming;
-  // Registering must use a wallet linked to the signed-in account — a connected wallet
-  // that isn't linked to any account can't submit on someone else's behalf.
-  const walletLinkedHere = !!address && !!(user?.walletAddresses ?? []).some(w => w.toLowerCase() === address.toLowerCase());
-  const canSubmit    = isConnected && !wrongNetwork && !!user && walletLinkedHere && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+  // Editing must use the wallet that owns the miner record being edited.
+  const walletOwnsRecord = !isEdit || (!!address && address.toLowerCase() === editRecord!.MinerAddress.toLowerCase());
+  const canSubmit    = isConnected && !wrongNetwork && !!user && walletOwnsRecord && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
@@ -352,11 +351,11 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   </button>
                 </div>
               )}
-              {!sessionLoading && user && !walletLinkedHere && (
+              {!sessionLoading && user && !walletOwnsRecord && (
                 <div className="wallet-disconnected" style={{ marginTop: 12 }}>
                   <p className="wallet-disconnected-text">
-                    {user.walletAddresses?.length
-                      ? 'Connect one of your linked wallets to register.'
+                    {isEdit
+                      ? 'Connect the wallet that registered this miner to edit it.'
                       : 'Link a wallet to your account to register.'}
                   </p>
                 </div>
@@ -567,6 +566,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 {!isConnected       ? 'Connect First'
                   : wrongNetwork    ? 'Switch to Base Sepolia'
                   : !user           ? 'Sign In First'
+                  : !walletOwnsRecord ? 'Connect the Owning Wallet'
                   : !CONTRACT_ADDRESS ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
                   : txError         ? (isEdit ? 'Retry Update' : 'Retry Registration')
