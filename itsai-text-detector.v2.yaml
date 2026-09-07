@@ -55,11 +55,13 @@ on_chain:
     integers:
       - index: 0
         name: answer_x100
+        description: AI-generated confidence score (0-1) times 100.
         source_path: answer
         multiplier: 100
     bools:
       - index: 0
         name: is_ai_generated
+        description: Whether the text was flagged as AI-generated.
         source_path: answer
         transform_rule: bool_from_eq:1
   request:

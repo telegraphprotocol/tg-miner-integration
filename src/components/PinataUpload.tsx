@@ -256,7 +256,7 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
                 Would Be Rejected On-Chain
               </div>
               <ul className="reg-info-list reg-info-list-error" style={{ paddingLeft: '16px' }}>
-                {conflicts.map((c, i) => <li key={i}>{c.message}</li>)}
+                {conflicts.map((c, i) => <li key={i}>{c.message?.trim() || (c.field ? `${c.field}: conflicts with an existing registration.` : 'Conflicts with an existing registration.')}</li>)}
               </ul>
               <p className="field-hint" style={{ margin: 0 }}>
                 This is the same rejection registerMiner would hit — fix it before spending gas.
@@ -290,26 +290,32 @@ export default function PinataUpload({ yaml, name, result, onResult, onBack, onN
               )}
               {requiresApiKey && !apiKeyStored && !apiKeyStaged && (
                 <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
-                  Key was tested but not staged — connect a wallet before validating so it can be
-                  staged for auto-install, or install it from your Dashboard after registering.
+                  {address
+                    ? 'Key was tested but not staged — likely because one or more endpoints failed above. Fix the failing endpoint(s) and re-validate, or install the key from your Dashboard after registering.'
+                    : 'Key was tested but not staged — connect a wallet before validating so it can be staged for auto-install, or install it from your Dashboard after registering.'}
                 </p>
               )}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 {validationResults.map((r, i) => (
                   <div key={i} style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
+                    display: 'flex', flexDirection: 'column', gap: '4px',
                     fontSize: '12px', fontFamily: 'var(--font-mono, monospace)',
                     padding: '6px 10px', borderRadius: '6px',
                     background: r.success ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
                     border: `1px solid ${r.success ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
                   }}>
-                    <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
-                      {r.success ? '✓' : '✗'}
-                    </span>
-                    <span style={{ opacity: 0.6, minWidth: '36px' }}>{r.method}</span>
-                    <span style={{ flex: 1 }}>{r.path}</span>
-                    <span style={{ opacity: 0.5 }}>HTTP {r.status}</span>
-                    <span style={{ opacity: 0.4, minWidth: '52px', textAlign: 'right' }}>{r.latency_ms}ms</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
+                        {r.success ? '✓' : '✗'}
+                      </span>
+                      <span style={{ opacity: 0.6, minWidth: '36px' }}>{r.method}</span>
+                      <span style={{ flex: 1 }}>{r.path}</span>
+                      <span style={{ opacity: 0.5 }}>HTTP {r.status}</span>
+                      <span style={{ opacity: 0.4, minWidth: '52px', textAlign: 'right' }}>{r.latency_ms}ms</span>
+                    </div>
+                    {!r.success && r.error && (
+                      <div style={{ opacity: 0.75, color: '#ef4444', paddingLeft: '16px' }}>{r.error}</div>
+                    )}
                   </div>
                 ))}
               </div>

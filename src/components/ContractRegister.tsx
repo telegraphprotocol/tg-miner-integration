@@ -11,6 +11,7 @@ import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
+import { parseYamlToForm } from '../yamlParse';
 import { useSession } from '../hooks/useSession';
 import { friendlyRevertMessage, intentRegistryAbi, type MinerRecordApi } from '../wasmAbi';
 
@@ -36,6 +37,32 @@ function Tip({ text }: { text: string }) {
 }
 
 type Mode = 'auto' | 'manual';
+
+interface ValidationResult {
+  path: string;
+  method: string;
+  status: number;
+  success: boolean;
+  error?: string;
+  latency_ms: number;
+}
+
+interface ValidationConflict {
+  field: string;
+  message: string;
+}
+
+interface ValidationResponse {
+  valid: boolean;
+  slug?: string;
+  name?: string;
+  errors: string[];
+  results: ValidationResult[] | null;
+  api_key_stored: boolean;
+  api_key_staged?: boolean;
+  staged_until?: string;
+  conflicts?: ValidationConflict[];
+}
 
 interface Props {
   yaml: string;
@@ -73,6 +100,29 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const [showHashModal, setShowHashModal] = useState(false);
   const [fetchingHash, setFetchingHash] = useState(false);
 
+  // manual-mode validate + API key (skipped entirely when editing)
+  const isManualValidatable = mode === 'manual' && !isEdit;
+  const [manualYamlText, setManualYamlText]           = useState('');
+  const [requiresApiKey, setRequiresApiKey]           = useState(true);
+  const [apiKey, setApiKey]                           = useState('');
+  const [validateState, setValidateState]             = useState<'idle' | 'validating' | 'valid' | 'error'>('idle');
+  const [validateErrorMsg, setValidateErrorMsg]       = useState('');
+  const [validationErrorsList, setValidationErrorsList] = useState<string[]>([]);
+  const [validationResults, setValidationResults]     = useState<ValidationResult[] | null>(null);
+  const [apiKeyStored, setApiKeyStored]               = useState(false);
+  const [apiKeyStaged, setApiKeyStaged]               = useState(false);
+  const [conflicts, setConflicts]                     = useState<ValidationConflict[]>([]);
+  // the (url, hash) pair the current validateState='valid' applies to — used to detect staleness
+  const [validatedFor, setValidatedFor]               = useState<{ url: string; hash: string } | null>(null);
+
+  useEffect(() => {
+    if (!isManualValidatable) return;
+    if (validateState === 'valid' && validatedFor && (validatedFor.url !== manualUrl || validatedFor.hash !== manualHash)) {
+      setValidateState('idle');
+      setValidatedFor(null);
+    }
+  }, [manualUrl, manualHash, validateState, validatedFor, isManualValidatable]);
+
   const handleFetchHashFromUrl = async () => {
     if (!manualUrl) return;
     setFetchingHash(true);
@@ -86,11 +136,85 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
       if (!res.ok) { toast.error(data.error || 'Could not fetch hash from that URL.'); return; }
       setManualHash(data.hash);
       setHashSourceUrl(manualUrl);
+      setManualYamlText(data.yaml ?? '');
       toast.success('Hash regenerated from URL.');
     } catch {
       toast.error('Network error fetching that URL.');
     } finally {
       setFetchingHash(false);
+    }
+  };
+
+  const handleValidate = async () => {
+    if (requiresApiKey && !apiKey.trim()) {
+      setValidateErrorMsg('API key is required.');
+      setValidateState('error');
+      return;
+    }
+
+    setValidateState('validating');
+    setValidateErrorMsg('');
+    setValidationErrorsList([]);
+    setValidationResults(null);
+    setApiKeyStored(false);
+    setApiKeyStaged(false);
+    setConflicts([]);
+
+    try {
+      // Always re-fetch on every Validate click — the URL's content may have changed
+      // since the last fetch (e.g. the user re-hosted a fix), and Validate is meant to
+      // check the live state of the URL, not a cached snapshot of it.
+      const hRes = await fetch('/api/yaml-hash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: manualUrl }),
+      });
+      const hData = await hRes.json();
+      if (!hRes.ok) { throw new Error(hData.error || 'Could not fetch YAML from that URL.'); }
+      const yamlText = hData.yaml ?? '';
+      setManualYamlText(yamlText);
+      setManualHash(hData.hash);
+      setHashSourceUrl(manualUrl);
+
+      const vRes = await fetch('/api/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          yaml: yamlText,
+          api_key: requiresApiKey ? apiKey.trim() : '',
+          ...(address ? { miner_address: address } : {}),
+        }),
+      });
+      if (!vRes.ok && vRes.status !== 200) {
+        const vErr = await vRes.json().catch(() => null);
+        const detail = vErr?.error ?? vErr?.message ?? (vErr ? JSON.stringify(vErr) : null);
+        throw new Error(detail ?? `Validation request failed (${vRes.status}) — no error detail returned.`);
+      }
+      const vData = await vRes.json() as ValidationResponse;
+      setValidationResults(vData.results ?? null);
+      setApiKeyStored(vData.api_key_stored);
+      setApiKeyStaged(!!vData.api_key_staged);
+      setConflicts(vData.conflicts ?? []);
+      if (!vData.valid) {
+        setValidationErrorsList(vData.errors ?? ['Unknown validation error']);
+        setValidateState('error');
+        toast.error('YAML validation failed — see details below.');
+        return;
+      }
+      setValidateState('valid');
+      setValidatedFor({ url: manualUrl, hash: manualHash.startsWith('0x') ? manualHash : `0x${manualHash}` });
+      try {
+        const parsedIntents = parseYamlToForm(yamlText).semantics_intents.filter(Boolean);
+        if (parsedIntents.length) setManualIntents(parsedIntents.join(', '));
+      } catch {
+        // fall back to whatever the user already typed — YAML is validator-approved but not necessarily parseable by our own subset parser
+      }
+      toast.success('Endpoint validated.');
+    } catch (err) {
+      const message = (err as Error).message ?? 'YAML validation request failed.';
+      setValidateErrorMsg(message);
+      setValidateState('error');
+      toast.error(message);
     }
   };
 
@@ -120,8 +244,9 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const urlError    = !effectiveUrl ? (mode === 'auto' ? 'Upload to IPFS first.' : 'IPFS URL is required.') : '';
   const hashError   = !effectiveHash || effectiveHash.length !== 66 ? 'Valid bytes32 hash required.' : '';
   const feeError    = !feeAddress || feeAddress === '0x0000000000000000000000000000000000000000' ? 'Fee address must be non-zero.' : '';
+  const endpointNotValidatedError = isManualValidatable && validateState !== 'valid' ? 'Validate the YAML endpoint before registering.' : '';
 
-  const validationErrors = [priceError, intentError, urlError, hashError, feeError].filter(Boolean);
+  const validationErrors = [priceError, intentError, urlError, hashError, feeError, endpointNotValidatedError].filter(Boolean);
 
   const { writeContract, data: txHash, isPending: isWritePending, error: writeError, reset } = useWriteContract();
   const {
@@ -451,18 +576,214 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                   disabled={isTxInFlight || isSuccess}
                 />
               </div>
-              <div className="field-group">
-                <label className="field-label">Supported Intents <span className="field-required">*</span><Tip text="Comma-separated list. At least one canonical intent required (e.g. chat_completion, web_search)." /></label>
-                <input
-                  className="field-input"
-                  type="text"
-                  placeholder="chat_completion, web_search"
-                  value={manualIntents}
-                  onChange={e => setManualIntents(e.target.value)}
-                  disabled={isTxInFlight || isSuccess}
-                />
-                {intentError && manualIntents !== '' && <p className="field-error">{intentError}</p>}
-              </div>
+
+              {isManualValidatable && (
+                <div className="field-group">
+                  <div className="toggle-row">
+                    <div>
+                      <div className="field-label">Requires API Key</div>
+                      <p className="field-hint" style={{ marginTop: 2 }}>
+                        Turn off for keyless miners — public APIs that don't need an upstream key.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`toggle ${requiresApiKey ? 'toggle-on' : ''}`}
+                      onClick={() => setRequiresApiKey(v => !v)}
+                      disabled={validateState === 'validating' || isTxInFlight || isSuccess}
+                    >
+                      <div className="toggle-thumb" />
+                    </button>
+                  </div>
+
+                  {requiresApiKey && (
+                    <>
+                      <label className="field-label" style={{ marginTop: '14px' }}>
+                        API Key <span className="field-required">*</span>
+                      </label>
+                      <input
+                        className="field-input"
+                        type="password"
+                        placeholder="Paste your upstream API key"
+                        value={apiKey}
+                        onChange={e => setApiKey(e.target.value)}
+                        disabled={validateState === 'validating' || isTxInFlight || isSuccess}
+                        autoComplete="off"
+                      />
+                      <p className="field-hint" style={{ marginTop: '4px', fontSize: '11px', opacity: 0.55 }}>
+                        Tested against your endpoints, then stored in the node DB. Never logged.
+                      </p>
+                    </>
+                  )}
+
+                  {validateErrorMsg && (
+                    <div className="reg-info-panel reg-info-panel-error" style={{ marginTop: '12px' }}>
+                      <div className="reg-info-title reg-info-title-error">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        Request Failed
+                      </div>
+                      <p className="field-hint" style={{ margin: 0, color: 'rgba(255,255,255,0.7)' }}>{validateErrorMsg}</p>
+                    </div>
+                  )}
+
+                  {validationErrorsList.length > 0 && (
+                    <div className="reg-info-panel reg-info-panel-error" style={{ marginTop: '12px' }}>
+                      <div className="reg-info-title reg-info-title-error">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        Validation Failed
+                      </div>
+                      <ul className="reg-info-list reg-info-list-error" style={{ paddingLeft: '16px' }}>
+                        {validationErrorsList.map((e, i) => <li key={i}>{e}</li>)}
+                      </ul>
+                      {!requiresApiKey && validationErrorsList.some(e => /api_key|api key/i.test(e)) && (
+                        <p className="field-hint" style={{ margin: 0, color: 'rgba(255,200,80,0.75)' }}>
+                          This endpoint needs a credential — switch on <strong>Requires API Key</strong> above and paste one in.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {conflicts.length > 0 && (
+                    <div className="reg-info-panel reg-info-panel-error" style={{ marginTop: '12px' }}>
+                      <div className="reg-info-title reg-info-title-error">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        Would Be Rejected On-Chain
+                      </div>
+                      <ul className="reg-info-list reg-info-list-error" style={{ paddingLeft: '16px' }}>
+                        {conflicts.map((c, i) => <li key={i}>{c.message?.trim() || (c.field ? `${c.field}: conflicts with an existing registration.` : 'Conflicts with an existing registration.')}</li>)}
+                      </ul>
+                      <p className="field-hint" style={{ margin: 0 }}>
+                        This is the same rejection registerMiner would hit — fix it before spending gas.
+                      </p>
+                    </div>
+                  )}
+
+                  {validationResults && validationResults.length > 0 && (
+                    <div style={{ marginTop: '12px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', opacity: 0.55, marginBottom: '8px' }}>
+                        ENDPOINT RESULTS
+                        {apiKeyStored && (
+                          <span className="badge-success" style={{ marginLeft: '8px', fontSize: '10px' }}>
+                            <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                              <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                            API KEY STORED
+                          </span>
+                        )}
+                        {!apiKeyStored && apiKeyStaged && (
+                          <span className="reg-status-badge wasm-status-pending" style={{ marginLeft: '8px' }}>
+                            KEY STAGED
+                          </span>
+                        )}
+                      </div>
+                      {requiresApiKey && apiKeyStaged && !apiKeyStored && (
+                        <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
+                          Key tested and staged against your connected wallet — it installs automatically
+                          the moment that wallet's registration lands, no extra step needed.
+                        </p>
+                      )}
+                      {requiresApiKey && !apiKeyStored && !apiKeyStaged && (
+                        <p className="field-hint" style={{ marginTop: '-4px', marginBottom: '12px' }}>
+                          {address
+                            ? 'Key was tested but not staged — likely because one or more endpoints failed above. Fix the failing endpoint(s) and re-validate, or install the key from your Dashboard after registering.'
+                            : 'Key was tested but not staged — connect a wallet before validating so it can be staged for auto-install, or install it from your Dashboard after registering.'}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        {validationResults.map((r, i) => (
+                          <div key={i} style={{
+                            display: 'flex', flexDirection: 'column', gap: '4px',
+                            fontSize: '12px', fontFamily: 'var(--font-mono, monospace)',
+                            padding: '6px 10px', borderRadius: '6px',
+                            background: r.success ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
+                            border: `1px solid ${r.success ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
+                                {r.success ? '✓' : '✗'}
+                              </span>
+                              <span style={{ opacity: 0.6, minWidth: '36px' }}>{r.method}</span>
+                              <span style={{ flex: 1 }}>{r.path}</span>
+                              <span style={{ opacity: 0.5 }}>HTTP {r.status}</span>
+                              <span style={{ opacity: 0.4, minWidth: '52px', textAlign: 'right' }}>{r.latency_ms}ms</span>
+                            </div>
+                            {!r.success && r.error && (
+                              <div style={{ opacity: 0.75, color: '#ef4444', paddingLeft: '16px' }}>{r.error}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    className={`btn-fill btn-full ${validateState === 'validating' ? 'btn-loading' : ''}`}
+                    style={{ marginTop: '14px' }}
+                    onClick={handleValidate}
+                    disabled={
+                      validateState === 'validating' || isTxInFlight || isSuccess ||
+                      !manualUrl || (requiresApiKey && !apiKey.trim())
+                    }
+                  >
+                    {validateState === 'validating' ? (
+                      <><span className="spinner" />Validating endpoints…</>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <polyline points="16 16 12 12 8 16"/>
+                          <line x1="12" y1="12" x2="12" y2="21"/>
+                          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+                        </svg>
+                        {validateState === 'valid' ? 'Re-validate' : validateState === 'error' ? 'Retry Validation' : 'Validate Endpoints'}
+                      </>
+                    )}
+                  </button>
+                  {validateState === 'valid' && (
+                    <p className="field-hint" style={{ marginTop: '8px', color: 'rgba(34,197,94,0.85)' }}>
+                      ✓ Endpoint validated — ready to register.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isManualValidatable ? (
+                intentError && validateState === 'valid' && (
+                  <div className="field-group">
+                    <label className="field-label">Supported Intents <span className="field-required">*</span><Tip text="Comma-separated list. At least one canonical intent required (e.g. chat_completion, web_search)." /></label>
+                    <input
+                      className="field-input"
+                      type="text"
+                      placeholder="chat_completion, web_search"
+                      value={manualIntents}
+                      onChange={e => setManualIntents(e.target.value)}
+                      disabled={isTxInFlight || isSuccess}
+                    />
+                    <p className="field-hint" style={{ marginTop: 6 }}>
+                      The validated YAML had no semantics.supported_intents — enter them manually.
+                    </p>
+                  </div>
+                )
+              ) : (
+                <div className="field-group">
+                  <label className="field-label">Supported Intents <span className="field-required">*</span><Tip text="Comma-separated list. At least one canonical intent required (e.g. chat_completion, web_search)." /></label>
+                  <input
+                    className="field-input"
+                    type="text"
+                    placeholder="chat_completion, web_search"
+                    value={manualIntents}
+                    onChange={e => setManualIntents(e.target.value)}
+                    disabled={isTxInFlight || isSuccess}
+                  />
+                  {intentError && manualIntents !== '' && <p className="field-error">{intentError}</p>}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -536,6 +857,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                     { label: 'Fee address set',       ok: !!feeAddress && feeAddress !== '0x0000000000000000000000000000000000000000' },
                     { label: 'Floor price ≥ $0.01',   ok: priceRaw >= MIN_PRICE_RAW },
                     { label: 'At least one intent',   ok: effectiveIntents.length > 0 },
+                    ...(isManualValidatable ? [{ label: 'Endpoint validated', ok: validateState === 'valid' }] : []),
                   ].map(item => (
                     <div key={item.label} className={`reg-check-item ${item.ok ? 'reg-check-ok' : 'reg-check-fail'}`}>
                       {item.ok
