@@ -1,4 +1,4 @@
-export type Step = 1 | 2 | 3;
+export type Step = 1 | 2;
 
 export type SchemaFieldType = 'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object';
 
@@ -155,12 +155,6 @@ export interface FormState {
   input_schema_fields: SchemaField[];
   output_schema_raw: string;
   output_schema_fields: SchemaField[];
-}
-
-export interface PinataResult {
-  hash: string;
-  url: string;
-  gateway: string;
 }
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const;

@@ -47,7 +47,7 @@ html { scroll-behavior: smooth; }
 }
 
 /* Ensure all app content sits above the background — excluding modal overlays
-   (e.g. ImportModal's .modal-bd) and the nav headers (.app-header, .lv2-nav),
+   (e.g. YamlHashModal's .modal-bd) and the nav headers (.app-header, .lv2-nav),
    which are direct children of .app/.lv2 and must keep their own higher z-index
    (position:fixed/z-index:1000 for modals to cover the screen; z-index:200/60
    for the headers so their account/wallet dropdowns aren't painted behind the

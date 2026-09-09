@@ -167,6 +167,13 @@ export default function YamlWizard({ state, onChange, onNext }: Props) {
           {renderSection()}
         </div>
 
+        {isLast && allBasicsOk && (
+          <p className="field-hint" style={{ padding: '0 4px' }}>
+            Download your YAML, host it somewhere publicly accessible (e.g. GitHub raw, a static host,
+            or IPFS yourself), then register using that URL in the next step.
+          </p>
+        )}
+
         <div className="wizard-form-footer">
           {secIdx > 0 && (
             <button type="button" className="btn-ghost" onClick={() => setActiveSection(SECTIONS[secIdx - 1].id)}>
@@ -198,7 +205,7 @@ export default function YamlWizard({ state, onChange, onNext }: Props) {
                     Download YAML
                   </button>
                   <button type="button" className="btn-fill" onClick={onNext}>
-                    Proceed to Upload →
+                    Proceed to Register →
                   </button>
                 </>
               ) : (

@@ -7,7 +7,6 @@ import { baseSepolia } from 'wagmi/chains';
 import { decodeEventLog } from 'viem';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'nextjs-toploader/app';
-import type { PinataResult } from '../types';
 import YamlHashModal from './YamlHashModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
@@ -19,12 +18,6 @@ const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? '') as `0
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
 const MIN_PRICE_RAW = BigInt(10_000); // $0.01 in 6-decimal USDC
 
-async function sha256Hex(text: string): Promise<`0x${string}`> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  const hex = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-  return `0x${hex}`;
-}
-
 function Tip({ text }: { text: string }) {
   return (
     <span className="field-tooltip-wrap">
@@ -35,8 +28,6 @@ function Tip({ text }: { text: string }) {
     </span>
   );
 }
-
-type Mode = 'auto' | 'manual';
 
 interface ValidationResult {
   path: string;
@@ -65,8 +56,6 @@ interface ValidationResponse {
 }
 
 interface Props {
-  yaml: string;
-  pinataResult: PinataResult | null;
   intents: string[];
   minPriceUsdc: string;
   onBack: () => void;
@@ -74,7 +63,7 @@ interface Props {
   editRecord?: MinerRecordApi;
 }
 
-export default function ContractRegister({ yaml, pinataResult, intents, minPriceUsdc, onBack, editRecord }: Props) {
+export default function ContractRegister({ intents, minPriceUsdc, onBack, editRecord }: Props) {
   const isEdit = !!editRecord;
   const toast = useToast();
   const router = useRouter();
@@ -82,11 +71,8 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const { address, isConnected, chain } = useAccount();
   const { user, isLoading: sessionLoading } = useSession();
 
-  // Editing only ever works from known existing values — there's no fresh YAML to auto-hash — so it's always 'manual'.
-  const [mode, setMode] = useState<Mode>(isEdit ? 'manual' : (pinataResult ? 'auto' : 'manual'));
   const [feeAddress, setFeeAddress]   = useState(editRecord?.FeeAddress ?? '');
   const [minPrice, setMinPrice]       = useState(editRecord ? ((editRecord.MinPriceUsdc ?? 0) / 1_000_000).toString() : (minPriceUsdc || '0.01'));
-  const [autoHash, setAutoHash]       = useState<`0x${string}` | ''>('');
 
   // manual-mode fields
   const [manualHash, setManualHash]       = useState(editRecord?.YamlHash ?? '');
@@ -101,7 +87,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
   const [fetchingHash, setFetchingHash] = useState(false);
 
   // manual-mode validate + API key (skipped entirely when editing)
-  const isManualValidatable = mode === 'manual' && !isEdit;
+  const isManualValidatable = !isEdit;
   const [manualYamlText, setManualYamlText]           = useState('');
   const [requiresApiKey, setRequiresApiKey]           = useState(true);
   const [apiKey, setApiKey]                           = useState('');
@@ -222,26 +208,19 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
     if (address && !feeAddress) setFeeAddress(address);
   }, [address, feeAddress]);
 
-  useEffect(() => {
-    if (!yaml) return;
-    sha256Hex(yaml).then(setAutoHash).catch(() => {});
-  }, [yaml]);
-
-  const effectiveHash    = mode === 'auto' ? autoHash : (manualHash.startsWith('0x') ? manualHash : `0x${manualHash}`);
-  const effectiveUrl     = mode === 'auto' ? (pinataResult?.gateway ?? '') : manualUrl;
+  const effectiveHash    = manualHash.startsWith('0x') ? manualHash : `0x${manualHash}`;
+  const effectiveUrl     = manualUrl;
   // Manual entry must match the same canonical form (UPPER_SNAKE_CASE) the on-chain
   // registry and the wizard's own intent picker use — otherwise the contract call
   // reverts with "intent not registered onchain" for a mismatched entry anywhere in
   // the array, which can look like it's about a completely different, valid intent.
-  const effectiveIntents = mode === 'auto'
-    ? intents
-    : manualIntents.split(',').map(s => s.trim().toUpperCase().replace(/\s+/g, '_')).filter(Boolean);
+  const effectiveIntents = manualIntents.split(',').map(s => s.trim().toUpperCase().replace(/\s+/g, '_')).filter(Boolean);
 
   // validation
   const priceRaw = BigInt(Math.round(parseFloat(minPrice || '0') * 1_000_000));
   const priceError  = priceRaw < MIN_PRICE_RAW ? 'Minimum is $0.01 (10,000 in 6-decimal USDC).' : '';
   const intentError = effectiveIntents.length === 0 ? 'At least one intent is required.' : '';
-  const urlError    = !effectiveUrl ? (mode === 'auto' ? 'Upload to IPFS first.' : 'IPFS URL is required.') : '';
+  const urlError    = !effectiveUrl ? 'YAML URL is required.' : '';
   const hashError   = !effectiveHash || effectiveHash.length !== 66 ? 'Valid bytes32 hash required.' : '';
   const feeError    = !feeAddress || feeAddress === '0x0000000000000000000000000000000000000000' ? 'Fee address must be non-zero.' : '';
   const endpointNotValidatedError = isManualValidatable && validateState !== 'valid' ? 'Validate the YAML endpoint before registering.' : '';
@@ -348,7 +327,7 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
     <div className="register-layout">
       {/* Header */}
       <div className="step-section-heading">
-        <div className="step-eyebrow">{isEdit ? 'EDIT REGISTRATION' : 'STEP 3 OF 3'}</div>
+        <div className="step-eyebrow">{isEdit ? 'EDIT REGISTRATION' : 'STEP 2 OF 2'}</div>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <h2 className="step-title">{isEdit ? 'Edit Registration' : 'Register On-Chain'}</h2>
@@ -394,26 +373,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
             <strong>Note:</strong> To change your YAML, fee address, floor price, or intents later, use Edit from your Dashboard —
             it issues a new registration ID under the hood, so anything targeting your old intent ID directly will need updating.
           </div>
-        </div>
-      )}
-
-      {/* Mode tabs — editing always uses manual input against known existing values */}
-      {!isEdit && (
-        <div className="sub-tabs" style={{ marginBottom: '24px' }}>
-          <button type="button" className={`sub-tab ${mode === 'auto' ? 'sub-tab-active' : ''}`} onClick={() => setMode('auto')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            </svg>
-            Use uploaded YAML
-            {pinataResult && <span className="sub-tab-count">✓</span>}
-          </button>
-          <button type="button" className={`sub-tab ${mode === 'manual' ? 'sub-tab-active' : ''}`} onClick={() => setMode('manual')}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Enter hash manually
-          </button>
         </div>
       )}
 
@@ -496,33 +455,10 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
               <polyline points="14 2 14 8 20 8"/>
             </svg>
-            <span>{mode === 'auto' ? 'YAML Source' : 'Manual Input'}</span>
+            <span>Manual Input</span>
           </div>
 
-          {mode === 'auto' ? (
-            <div className="wallet-info">
-              <div className="wallet-info-row">
-                <span className="result-row-label">YAML HASH</span>
-                <span className="result-row-value result-mono result-truncate">{autoHash || '—'}</span>
-              </div>
-              <div className="wallet-info-row">
-                <span className="result-row-label">IPFS URL</span>
-                <span className="result-row-value result-mono result-truncate">
-                  {pinataResult?.gateway ?? <span style={{ color: 'rgba(255,120,100,0.7)' }}>Not uploaded yet</span>}
-                </span>
-              </div>
-              <div className="wallet-info-row">
-                <span className="result-row-label">INTENTS</span>
-                <span className="result-row-value" style={{ wordBreak: 'break-word' }}>
-                  {intents.length > 0 ? intents.join(', ') : <span style={{ color: 'rgba(255,120,100,0.7)' }}>None — add intents in Semantics</span>}
-                </span>
-              </div>
-              <p className="field-hint" style={{ marginTop: 8 }}>
-                Hash is computed client-side using SHA-256 of the raw YAML bytes — identical to <code className="inline-code">sha256sum</code>.
-              </p>
-            </div>
-          ) : (
-            <div className="upload-fields">
+          <div className="upload-fields">
               <div className="field-group">
                 <label className="field-label">
                   YAML URL <span className="field-required">*</span>
@@ -785,7 +721,6 @@ export default function ContractRegister({ yaml, pinataResult, intents, minPrice
                 </div>
               )}
             </div>
-          )}
         </div>
 
         {/* Registration params */}

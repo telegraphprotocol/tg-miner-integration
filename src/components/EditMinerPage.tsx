@@ -81,8 +81,6 @@ export default function EditMinerPage() {
           </div>
         ) : (
           <ContractRegister
-            yaml=""
-            pinataResult={null}
             intents={[]}
             minPriceUsdc=""
             editRecord={record}

@@ -20,19 +20,10 @@ const CARDS = [
     mode: 'create',
   },
   {
-    key: 'import',
-    step: '02',
-    title: 'Import & Upload',
-    desc: 'Import an existing YAML file, review parsed values, and pin to IPFS.',
-    cta: 'Import YAML →',
-    tags: ['Import', 'IPFS · Pinata'],
-    mode: 'import',
-  },
-  {
     key: 'register',
-    step: '03',
+    step: '02',
     title: 'Register',
-    desc: 'Already have an IPFS hash? Submit directly to the registry contract on Base Sepolia.',
+    desc: 'Already have a hosted YAML? Submit directly to the registry contract on Base Sepolia.',
     cta: 'Register now →',
     tags: ['Base Sepolia', 'Registry'],
     mode: 'hash',
@@ -88,7 +79,6 @@ export default function LandingPage() {
 
   const handlers: Record<string, () => void> = {
     create: () => router.push('/register?mode=create'),
-    import: () => router.push('/register?mode=import'),
     register: () => router.push('/register?mode=hash'),
   };
 

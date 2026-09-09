@@ -13,8 +13,7 @@ interface Props {
 
 const STEPS = [
   { n: 1, label: 'Configure YAML' },
-  { n: 2, label: 'Upload to IPFS' },
-  { n: 3, label: 'Register On-Chain' },
+  { n: 2, label: 'Register On-Chain' },
 ];
 
 export default function Header({ step, onBack }: Props) {

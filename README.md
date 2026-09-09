@@ -1,14 +1,13 @@
 # Telegraph Miner Registry
 
-Register your inference node on the [Telegraph Protocol](https://telegraphprotocol.com/). Configure a YAML descriptor, pin it to IPFS, and submit your registration to the Telegraph Diamond contract on Base Sepolia — all from one interface.
+Register your inference node on the [Telegraph Protocol](https://telegraphprotocol.com/). Configure a YAML descriptor, host it publicly, and submit your registration to the Telegraph Diamond contract on Base Sepolia — all from one interface.
 
 ---
 
 ## What You Can Do
 
-- **Create a YAML config** from scratch using a guided step-by-step wizard
-- **Import an existing YAML** file, review the parsed values, and upload to IPFS
-- **Register on-chain** using either an IPFS URL from the upload step, or a hash you already have
+- **Create a YAML config** from scratch using a guided step-by-step wizard, then download it to host yourself
+- **Register on-chain** using the public URL where you're hosting your YAML, and its hash
 
 ---
 
@@ -48,7 +47,7 @@ npm run build && npm start   # production
 
 ## How Registration Works
 
-The app presents three paths on the landing screen. Choose the one that fits your situation:
+The app presents two paths on the landing screen. Choose the one that fits your situation:
 
 ---
 
@@ -58,37 +57,25 @@ Use this if you are setting up a new miner and don't have a config file yet.
 
 1. Click **Start building** on the landing screen.
 2. Work through each wizard section — Basics, Connection, Endpoints, Semantics, On-Chain, and Advanced. Required fields are marked with `*`.
-3. A live YAML preview updates as you fill in values. Once all required sections are complete, click **Next: Upload to IPFS**.
-4. On the upload step, click **Pin to IPFS**. The app sends your YAML to Pinata server-side and returns an IPFS URL and CID.
-5. Click **Next: Register On-Chain** to proceed to the transaction step (see [Submitting the transaction](#submitting-the-transaction) below).
+3. A live YAML preview updates as you fill in values. Once all required sections are complete, click **Download YAML**.
+4. Host the downloaded file somewhere publicly accessible (e.g. GitHub raw, a static host, or IPFS yourself).
+5. Click **Proceed to Register →** to continue to the transaction step (see [Submitting the transaction](#submitting-the-transaction) below), then fill in the public URL and the file's hash.
 
 ---
 
-### Option 2 — Import an existing YAML
-
-Use this if you already have a YAML file and want to upload it to IPFS and register it.
-
-1. Click **Import YAML** on the landing screen.
-2. Either paste your YAML directly or drag and drop a `.yaml` / `.yml` file.
-3. Click **Import & Edit** — the wizard opens pre-filled with all parsed values so you can review or adjust anything before uploading.
-4. Continue from step 4 in Option 1.
-
----
-
-### Option 3 — Register with an existing hash
+### Option 2 — Register with an existing hash
 
 Use this if your YAML is already hosted somewhere and you just need to submit the on-chain transaction.
 
 1. Click **Register now** on the landing screen.
-2. Select the **Enter hash manually** tab.
-3. Fill in your YAML URL, YAML hash, and supported intents. If you need to generate the hash from a local file, click **Generate from file** next to the hash field — the hash is computed client-side and never uploaded.
-4. Continue to [Submitting the transaction](#submitting-the-transaction) below.
+2. Fill in your YAML URL, YAML hash, and supported intents. If you need to generate the hash from a local file, click **Generate from file** next to the hash field — the hash is computed client-side and never uploaded.
+3. Continue to [Submitting the transaction](#submitting-the-transaction) below.
 
 ---
 
 ### Submitting the transaction
 
-Applies to all three paths once you reach the Register On-Chain screen.
+Applies to both paths once you reach the Register On-Chain screen.
 
 1. **Connect your wallet** using the button in the Wallet card. Make sure you are on **Base Sepolia** — the app will prompt you to switch if needed.
 2. Set your **Fee Address** (defaults to your connected wallet) and **Floor Price** (minimum $0.01 USDC).
