@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  const validatorUrl = process.env.VALIDATOR_BASE_URL ?? process.env.NEXT_PUBLIC_TELEGRAPH_NODE_URL;
+  const validatorUrl = (process.env.VALIDATOR_BASE_URL ?? process.env.NEXT_PUBLIC_TELEGRAPH_NODE_URL)?.replace(/\/+$/, '');
 
   if (!validatorUrl) {
     return NextResponse.json({ error: 'Registry node not configured on server.' }, { status: 500 });

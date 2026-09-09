@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const validatorUrl = process.env.VALIDATOR_BASE_URL;
+  const validatorUrl = process.env.VALIDATOR_BASE_URL?.replace(/\/+$/, '');
 
   if (!validatorUrl) {
     return NextResponse.json({ error: 'Validator not configured on server.' }, { status: 500 });
