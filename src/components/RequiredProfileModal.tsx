@@ -6,6 +6,7 @@ import { useToast } from './Toast';
 import Spinner from './Spinner';
 import CountrySelect from './CountrySelect';
 import { useGeoCountryGuess } from '../hooks/useGeoCountryGuess';
+import { apiPost, errorMessage } from '../lib/api';
 
 /**
  * Blocking, non-dismissable modal shown to any signed-in user missing a
@@ -34,13 +35,9 @@ export default function RequiredProfileModal() {
     if (!country) { setCountryError('Select your country.'); return; }
     setCountryBusy(true);
     try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country }),
-      });
+      const res = await apiPost('/auth/profile', { country });
       const data = await res.json();
-      if (!res.ok) { setCountryError(data.error || 'Could not save country.'); return; }
+      if (!res.ok) { setCountryError(errorMessage(data, 'Could not save country.')); return; }
       toast.success('Country saved.');
       refetch();
     } catch {

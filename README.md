@@ -24,17 +24,18 @@ npm install
 Create a `.env.local` file in the project root:
 
 ```bash
-PINATA_API_KEY=your_pinata_api_key
-PINATA_API_SECRET=your_pinata_api_secret
-NEXT_PUBLIC_REGISTRY_CONTRACT=0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
+NEXT_PUBLIC_REGISTRY_CONTRACT=0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_walletconnect_project_id
 ```
 
 | Variable | Where to get it |
 |---|---|
-| `PINATA_API_KEY` / `PINATA_API_SECRET` | [app.pinata.cloud](https://app.pinata.cloud) → API Keys |
+| `NEXT_PUBLIC_BACKEND_URL` | URL of the deployed `telegraph-backend` (accounts, validation, registrations, leaderboard). Its `CORS_ORIGINS` must include this app's origin. |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | [cloud.walletconnect.com](https://cloud.walletconnect.com) |
 | `NEXT_PUBLIC_REGISTRY_CONTRACT` | Telegraph Diamond contract — pre-filled above |
+
+This app has no server of its own: every API call goes to `telegraph-backend`. Email accounts register through the backend with gas sponsored; wallet accounts sign in with their wallet (SIWE) and send the registration transaction themselves.
 
 ### 3. Run
 
@@ -102,8 +103,8 @@ Applies to both paths once you reach the Register On-Chain screen.
 | | |
 |---|---|
 | Network | Base Sepolia (chain ID 84532) |
-| Address | `0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3` |
-| Explorer | [sepolia.basescan.org](https://sepolia.basescan.org/address/0xac683bFa8F1C892E23e8300d14c20678C6FC0CA3) |
+| Address | `0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8` |
+| Explorer | [sepolia.basescan.org](https://sepolia.basescan.org/address/0x5a2324aA18613FAD4e44bDF0d6c73Ec1f6D87ff8) |
 
 ---
 

@@ -40,7 +40,8 @@ export default function AccountButton() {
   }
 
   if (user) {
-    const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email;
+    const identifier = user.email ?? (user.walletAddress ? `${user.walletAddress.slice(0, 6)}…${user.walletAddress.slice(-4)}` : '');
+    const displayName = [user.firstName, user.lastName].filter(Boolean).join(' ') || identifier;
     return (
       <div className="account-btn-wrap" ref={wrapRef}>
         <button type="button" className="wallet-pill" onClick={() => setOpen(v => !v)}>
@@ -54,8 +55,8 @@ export default function AccountButton() {
         {open && (
           <div className="ext-links-dropdown account-dropdown">
             <div className="account-dropdown-email">
-              {displayName !== user.email && <div className="account-dropdown-name">{displayName}</div>}
-              <div>{user.email}</div>
+              {displayName !== identifier && <div className="account-dropdown-name">{displayName}</div>}
+              <div>{identifier}</div>
             </div>
             <button
               type="button"

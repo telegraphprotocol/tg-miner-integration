@@ -8,6 +8,7 @@ import CountrySelect from './CountrySelect';
 import CountryFlag from './CountryFlag';
 import { countryName } from '../countries';
 import { useGeoCountryGuess } from '../hooks/useGeoCountryGuess';
+import { apiPost, errorMessage } from '../lib/api';
 
 function DiscordIcon() {
   return (
@@ -95,13 +96,9 @@ function NameCard() {
     setShowConfirm(false);
     setBusy(true);
     try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName }),
-      });
+      const res = await apiPost('/auth/profile', { firstName, lastName });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not save name.'); return; }
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not save name.')); return; }
       toast.success('Name saved — it\'s now locked.');
       refetch();
     } catch {
@@ -236,13 +233,9 @@ function CountryCard() {
     if (!country) { toast.error('Select your country.'); return; }
     setBusy(true);
     try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country }),
-      });
+      const res = await apiPost('/auth/profile', { country });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not save country.'); return; }
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not save country.')); return; }
       toast.success('Country saved — it\'s now locked.');
       refetch();
     } catch {
@@ -298,13 +291,9 @@ function SocialHandlesCard() {
   const handleSave = async () => {
     setBusy(true);
     try {
-      const res = await fetch('/api/auth/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ discordUsername, xUsername }),
-      });
+      const res = await apiPost('/auth/profile', { discordUsername, xUsername });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not save social handles.'); return; }
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not save social handles.')); return; }
       toast.success('Social handles saved.');
       setEditing(false);
       refetch();

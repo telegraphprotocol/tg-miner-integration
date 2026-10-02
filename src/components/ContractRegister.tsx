@@ -12,7 +12,8 @@ import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { parseYamlToForm } from '../yamlParse';
 import { useSession } from '../hooks/useSession';
-import { friendlyRevertMessage, intentRegistryAbi, type MinerRecordApi } from '../wasmAbi';
+import { apiFetch, apiPost, errorMessage } from '../lib/api';
+import { friendlyRevertMessage, intentRegistryAbi, type AddressBundleResponse, type MinerRecordApi } from '../wasmAbi';
 
 const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_REGISTRY_CONTRACT ?? '') as `0x${string}`;
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
@@ -70,6 +71,12 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
   const pathname = usePathname();
   const { address, isConnected, chain } = useAccount();
   const { user, isLoading: sessionLoading } = useSession();
+  // Email accounts register through the backend (gas sponsored); wallet accounts sign in their own wallet.
+  const isEmailUser = user?.primaryAuth === 'EMAIL';
+
+  const [emailTx, setEmailTx]           = useState<string | null>(null);
+  const [emailPending, setEmailPending] = useState(false);
+  const [emailError, setEmailError]     = useState('');
 
   const [feeAddress, setFeeAddress]   = useState(editRecord?.FeeAddress ?? '');
   const [minPrice, setMinPrice]       = useState(editRecord ? ((editRecord.MinPriceUsdc ?? 0) / 1_000_000).toString() : (minPriceUsdc || '0.01'));
@@ -113,16 +120,12 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
     if (!manualUrl) return;
     setFetchingHash(true);
     try {
-      const res = await fetch('/api/yaml-hash', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: manualUrl }),
-      });
+      const res = await apiPost('/registrations/yaml-hash', { yamlUrl: manualUrl });
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not fetch hash from that URL.'); return; }
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not fetch hash from that URL.')); return; }
       setManualHash(data.hash);
       setHashSourceUrl(manualUrl);
-      setManualYamlText(data.yaml ?? '');
+      setManualYamlText(data.text ?? '');
       toast.success('Hash regenerated from URL.');
     } catch {
       toast.error('Network error fetching that URL.');
@@ -150,33 +153,26 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
       // Always re-fetch on every Validate click — the URL's content may have changed
       // since the last fetch (e.g. the user re-hosted a fix), and Validate is meant to
       // check the live state of the URL, not a cached snapshot of it.
-      const hRes = await fetch('/api/yaml-hash', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: manualUrl }),
-      });
+      const hRes = await apiPost('/registrations/yaml-hash', { yamlUrl: manualUrl });
       const hData = await hRes.json();
-      if (!hRes.ok) { throw new Error(hData.error || 'Could not fetch YAML from that URL.'); }
-      const yamlText = hData.yaml ?? '';
+      if (!hRes.ok) { throw new Error(errorMessage(hData, 'Could not fetch YAML from that URL.')); }
+      const yamlText = hData.text ?? '';
       setManualYamlText(yamlText);
       setManualHash(hData.hash);
       setHashSourceUrl(manualUrl);
 
-      const vRes = await fetch('/api/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          yaml: yamlText,
-          api_key: requiresApiKey ? apiKey.trim() : '',
-          ...(address ? { miner_address: address } : {}),
-        }),
+      // The backend validates on behalf of the signed-in account (no miner_address in the body)
+      // and returns a failed validation as an HTTP 400 carrying the same result body.
+      const vRes = await apiPost('/registrations/validate', {
+        yaml: yamlText,
+        ...(requiresApiKey ? { apiKey: apiKey.trim() } : {}),
       });
-      if (!vRes.ok && vRes.status !== 200) {
-        const vErr = await vRes.json().catch(() => null);
-        const detail = vErr?.error ?? vErr?.message ?? (vErr ? JSON.stringify(vErr) : null);
-        throw new Error(detail ?? `Validation request failed (${vRes.status}) — no error detail returned.`);
+      const vBody = await vRes.json().catch(() => null);
+      if (!vRes.ok && (vBody as ValidationResponse | null)?.valid !== false) {
+        const detail = errorMessage(vBody, vBody ? JSON.stringify(vBody) : '');
+        throw new Error(detail || `Validation request failed (${vRes.status}) — no error detail returned.`);
       }
-      const vData = await vRes.json() as ValidationResponse;
+      const vData = vBody as ValidationResponse;
       setValidationResults(vData.results ?? null);
       setApiKeyStored(vData.api_key_stored);
       setApiKeyStaged(!!vData.api_key_staged);
@@ -204,9 +200,10 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
     }
   };
 
+  const defaultFeeAddress = isEmailUser ? user?.smartWalletAddress : address;
   useEffect(() => {
-    if (address && !feeAddress) setFeeAddress(address);
-  }, [address, feeAddress]);
+    if (defaultFeeAddress && !feeAddress) setFeeAddress(defaultFeeAddress);
+  }, [defaultFeeAddress, feeAddress]);
 
   const effectiveHash    = manualHash.startsWith('0x') ? manualHash : `0x${manualHash}`;
   const effectiveUrl     = manualUrl;
@@ -236,14 +233,22 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
     error: receiptError,
   } = useWaitForTransactionReceipt({ hash: txHash });
 
-  const wrongNetwork = isConnected && chain?.id !== baseSepolia.id;
-  const isSuccess    = isConfirmed && receipt?.status === 'success';
+  const wrongNetwork = !isEmailUser && isConnected && chain?.id !== baseSepolia.id;
+  const walletSuccess = isConfirmed && receipt?.status === 'success';
+  const isSuccess    = isEmailUser ? !!emailTx : walletSuccess;
   const isReverted   = isConfirmed && receipt?.status !== 'success';
   const txError      = writeError ?? receiptError;
-  const isTxInFlight = isWritePending || isConfirming;
-  // Editing must use the wallet that owns the miner record being edited.
+  const isTxInFlight = isEmailUser ? emailPending : isWritePending || isConfirming;
+  const shownTxHash  = isEmailUser ? emailTx : txHash;
+  // Wallet accounts must register with the wallet they signed in with (the backend validates against it);
+  // editing must additionally use the wallet that owns the miner record being edited.
+  const walletMatchesLogin = !!address && !!user?.walletAddress && address.toLowerCase() === user.walletAddress.toLowerCase();
   const walletOwnsRecord = !isEdit || (!!address && address.toLowerCase() === editRecord!.MinerAddress.toLowerCase());
-  const canSubmit    = isConnected && !wrongNetwork && !!user && walletOwnsRecord && !!CONTRACT_ADDRESS && validationErrors.length === 0;
+  // Email accounts edit through the backend too, but only registrations their own smart wallet owns.
+  const emailOwnsRecord = !isEdit || (!!user?.smartWalletAddress && user.smartWalletAddress.toLowerCase() === editRecord!.MinerAddress.toLowerCase());
+  const canSubmit    = isEmailUser
+    ? !!user && emailOwnsRecord && validationErrors.length === 0
+    : isConnected && !wrongNetwork && !!user && walletMatchesLogin && walletOwnsRecord && !!CONTRACT_ADDRESS && validationErrors.length === 0;
 
   const toastedTxRef = useRef<string | null>(null);
   useEffect(() => {
@@ -274,6 +279,33 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
   // no dependency on the registry's own indexing/serving lag.
   const [freshRegistrationId, setFreshRegistrationId] = useState<string | null>(null);
 
+  // Email accounts get only a tx hash back from the sponsored call, so find the new registration
+  // id by polling the address bundle until a miner with this YAML URL shows up.
+  useEffect(() => {
+    if (!isEmailUser || !emailTx || !user?.smartWalletAddress) return;
+    let cancelled = false;
+    let attempts = 0;
+    const poll = async () => {
+      attempts += 1;
+      try {
+        const res = await apiFetch(`/registrations/address/${user.smartWalletAddress}`);
+        if (res.ok) {
+          const bundle = (await res.json()) as AddressBundleResponse;
+          const match = (bundle.miners ?? [])
+            .filter(m => m.YamlURL === effectiveUrl && (!editRecord || Number(m.RegistrationID) > Number(editRecord.RegistrationID)))
+            .sort((a, b) => Number(b.RegistrationID) - Number(a.RegistrationID))[0];
+          if (match && !cancelled) { setFreshRegistrationId(String(match.RegistrationID)); return; }
+        }
+      } catch {
+        // keep polling
+      }
+      if (!cancelled && attempts < 12) setTimeout(poll, 5000);
+    };
+    poll();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEmailUser, emailTx, user?.smartWalletAddress]);
+
   useEffect(() => {
     if (!isSuccess || !receipt) return;
     for (const log of receipt.logs) {
@@ -291,8 +323,44 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
     if (txError) toast.error(friendlyRevertMessage(txError.message ?? 'Transaction failed.'));
   }, [txError, toast]);
 
+  const handleEmailRegister = async () => {
+    setEmailError('');
+    setEmailPending(true);
+    try {
+      const res = isEdit
+        ? await apiPost('/registrations/miner/update', {
+            registrationId: editRecord!.RegistrationID,
+            yamlUrl: effectiveUrl,
+            feeAddress,
+            minPriceUsdc: Number(priceRaw),
+            supportedIntents: effectiveIntents,
+          })
+        : await apiPost('/registrations/miner', {
+            yamlUrl: effectiveUrl,
+            feeAddress,
+            minPriceUsdc: Number(priceRaw),
+            supportedIntents: effectiveIntents,
+            ...(requiresApiKey ? { apiKey: apiKey.trim() } : {}),
+          });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(errorMessage(data, `${isEdit ? 'Update' : 'Registration'} failed (HTTP ${res.status}).`));
+      setEmailTx((data as { txHash: string }).txHash);
+      toast.success(isEdit ? 'Miner updated on-chain successfully.' : 'Miner registered on-chain successfully.');
+    } catch (err) {
+      const message = (err as Error).message || 'Registration failed.';
+      setEmailError(message);
+      toast.error(message);
+    } finally {
+      setEmailPending(false);
+    }
+  };
+
   const handleRegister = () => {
     if (!canSubmit) return;
+    if (isEmailUser) {
+      handleEmailRegister();
+      return;
+    }
     if (isEdit) {
       writeContract({
         address: CONTRACT_ADDRESS,
@@ -387,7 +455,27 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
             </svg>
             <span>Wallet</span>
           </div>
-          {!isConnected ? (
+          {isEmailUser ? (
+            <div className="wallet-info">
+              <div className="wallet-status-row">
+                <div className="result-dot" />
+                <span className="wallet-status-text">Signed in as {user?.email} · gas sponsored</span>
+              </div>
+              <div className="wallet-info-row">
+                <span className="result-row-label">ACCOUNT WALLET</span>
+                <span className="result-row-value result-mono">{user?.smartWalletAddress ?? 'Being provisioned…'}</span>
+              </div>
+              <div className="wallet-info-row">
+                <span className="result-row-label">CONTRACT</span>
+                <span className="result-row-value result-mono result-truncate">{CONTRACT_ADDRESS || '—'}</span>
+              </div>
+              {isEdit && !emailOwnsRecord && (
+                <p className="field-hint" style={{ marginTop: 8 }}>
+                  This registration belongs to a different account wallet, so it can&apos;t be edited from this email account.
+                </p>
+              )}
+            </div>
+          ) : !isConnected ? (
             <div className="wallet-disconnected">
               <p className="wallet-disconnected-text">Connect your wallet to proceed.</p>
               <ConnectButton.Custom>
@@ -435,13 +523,14 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                   </button>
                 </div>
               )}
-              {!sessionLoading && user && !walletOwnsRecord && (
+              {!sessionLoading && user && !walletMatchesLogin && (
                 <div className="wallet-disconnected" style={{ marginTop: 12 }}>
-                  <p className="wallet-disconnected-text">
-                    {isEdit
-                      ? 'Connect the wallet that registered this miner to edit it.'
-                      : 'Link a wallet to your account to register.'}
-                  </p>
+                  <p className="wallet-disconnected-text">Connect the wallet you signed in with to continue.</p>
+                </div>
+              )}
+              {!sessionLoading && user && walletMatchesLogin && !walletOwnsRecord && (
+                <div className="wallet-disconnected" style={{ marginTop: 12 }}>
+                  <p className="wallet-disconnected-text">Connect the wallet that registered this miner to edit it.</p>
                 </div>
               )}
             </div>
@@ -783,7 +872,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
           {!isSuccess && !isTxInFlight && (
             <>
               {/* pre-flight checklist */}
-              {isConnected && !wrongNetwork && (
+              {(isEmailUser || (isConnected && !wrongNetwork)) && (
                 <div className="reg-checklist">
                   {[
                     { label: 'Signed in',             ok: !!user },
@@ -805,7 +894,10 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                 </div>
               )}
 
-              {txError && (
+              {isEmailUser && emailError && (
+                <p className="field-error" style={{ marginBottom: '16px' }}>{emailError}</p>
+              )}
+              {!isEmailUser && txError && (
                 <p className="field-error" style={{ marginBottom: '16px' }}>
                   {txError.message?.split('\n')[0] ?? 'Transaction failed.'}
                 </p>
@@ -820,13 +912,15 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                {!isConnected       ? 'Connect First'
+                {!user              ? 'Sign In First'
+                  : isEmailUser && !emailOwnsRecord ? 'Not Your Registration'
+                  : !isEmailUser && !isConnected ? 'Connect First'
                   : wrongNetwork    ? 'Switch to Base Sepolia'
-                  : !user           ? 'Sign In First'
-                  : !walletOwnsRecord ? 'Connect the Owning Wallet'
-                  : !CONTRACT_ADDRESS ? 'Contract Not Configured'
+                  : !isEmailUser && !walletMatchesLogin ? 'Connect Your Sign-In Wallet'
+                  : !isEmailUser && !walletOwnsRecord ? 'Connect the Owning Wallet'
+                  : !CONTRACT_ADDRESS && !isEmailUser ? 'Contract Not Configured'
                   : validationErrors.length > 0 ? 'Fix errors above'
-                  : txError         ? (isEdit ? 'Retry Update' : 'Retry Registration')
+                  : (isEmailUser ? emailError : txError) ? (isEdit ? 'Retry Update' : 'Retry Registration')
                   : isEdit          ? 'Update Miner'
                   : 'Register Miner'}
               </button>
@@ -839,14 +933,16 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                 <span className="spinner spinner-lg" />
                 <div className="tx-pending-text">
                   <span className="tx-pending-title">
-                    {isWritePending ? 'Awaiting signature…' : 'Confirming on-chain…'}
+                    {isEmailUser ? 'Submitting sponsored registration…' : isWritePending ? 'Awaiting signature…' : 'Confirming on-chain…'}
                   </span>
                   <span className="tx-pending-sub">
-                    {isWritePending
-                      ? 'Approve the transaction in your wallet.'
-                      : 'Waiting for Base Sepolia confirmation. This usually takes a few seconds.'}
+                    {isEmailUser
+                      ? 'We validate your YAML and send the transaction for you — no gas needed.'
+                      : isWritePending
+                        ? 'Approve the transaction in your wallet.'
+                        : 'Waiting for Base Sepolia confirmation. This usually takes a few seconds.'}
                   </span>
-                  {txHash && !isWritePending && (
+                  {txHash && !isEmailUser && !isWritePending && (
                     <a
                       className="result-row-link result-mono"
                       href={`${BASE_SEPOLIA_EXPLORER}/tx/${txHash}`}
@@ -862,7 +958,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
             </div>
           )}
 
-          {isSuccess && txHash && (
+          {isSuccess && shownTxHash && (
             <div className="tx-confirmed">
               <div className="tx-success-icon">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -881,11 +977,11 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                   <span className="result-row-label">TX HASH</span>
                   <a
                     className="result-row-link result-mono"
-                    href={`${BASE_SEPOLIA_EXPLORER}/tx/${txHash}`}
+                    href={`${BASE_SEPOLIA_EXPLORER}/tx/${shownTxHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {txHash.slice(0, 18)}…{txHash.slice(-8)}
+                    {shownTxHash.slice(0, 18)}…{shownTxHash.slice(-8)}
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                       <polyline points="15 3 21 3 21 9"/>

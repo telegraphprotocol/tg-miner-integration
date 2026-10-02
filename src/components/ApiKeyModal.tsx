@@ -5,6 +5,8 @@ import { useSignMessage } from 'wagmi';
 import { keccak256, toBytes } from 'viem';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
+import { apiPost, errorMessage } from '../lib/api';
+import { useSession } from '../hooks/useSession';
 
 interface Props {
   slug: string;
@@ -30,6 +32,8 @@ const STEP_ORDER: Status[] = ['requesting-challenge', 'awaiting-signature', 'ins
 
 export default function ApiKeyModal({ slug, onClose }: Props) {
   const toast = useToast();
+  const { user } = useSession();
+  const isEmailUser = user?.primaryAuth === 'EMAIL';
   const { signMessageAsync } = useSignMessage();
   const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState<Status>('idle');
@@ -48,16 +52,47 @@ export default function ApiKeyModal({ slug, onClose }: Props) {
 
     setErrorMsg('');
     setEndpointResults(null);
+
+    // Email accounts have no browser wallet to sign with — the backend signs the challenge for them.
+    if (isEmailUser) {
+      setStatus('installing');
+      try {
+        const res = await apiPost('/registrations/miner/api-key', { slug, apiKey: apiKey.trim() });
+        const data = await res.json().catch(() => null);
+        if (res.ok) {
+          setStatus('done');
+          toast.success('API key installed. It takes effect on the next call.');
+          onClose();
+          return;
+        }
+        if (res.status === 422) {
+          setEndpointResults(data?.results ?? null);
+          setErrorMsg('Your endpoints rejected the key — nothing was stored.');
+          setStatus('error');
+          return;
+        }
+        if (res.status === 429) {
+          throw new Error(errorMessage(data, "This miner's key was updated in the last 30s — try again shortly."));
+        }
+        if (res.status === 404) {
+          throw new Error('No live registration found for this slug — register first, then install the key.');
+        }
+        throw new Error(errorMessage(data, `Install failed (HTTP ${res.status}).`));
+      } catch (err) {
+        const message = (err as Error).message ?? 'Key install failed.';
+        setErrorMsg(message);
+        setStatus('error');
+        toast.error(message);
+      }
+      return;
+    }
+
     setStatus('requesting-challenge');
 
     try {
       const keyHash = keccak256(toBytes(apiKey.trim()));
 
-      const challengeRes = await fetch('/api/miner-key/challenge', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, key_hash: keyHash }),
-      });
+      const challengeRes = await apiPost('/miner-key/challenge', { slug, key_hash: keyHash });
       const challengeData = await challengeRes.json();
       if (!challengeRes.ok) {
         throw new Error(challengeData.error || `Could not request a challenge (HTTP ${challengeRes.status}).`);
@@ -69,11 +104,7 @@ export default function ApiKeyModal({ slug, onClose }: Props) {
       const signature = await signMessageAsync({ message });
 
       setStatus('installing');
-      const installRes = await fetch('/api/miner-key/install', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug, nonce, signature, api_key: apiKey.trim() }),
-      });
+      const installRes = await apiPost('/miner-key/install', { slug, nonce, signature, api_key: apiKey.trim() });
       const installData = await installRes.json();
 
       if (installRes.status === 200) {
@@ -130,8 +161,12 @@ export default function ApiKeyModal({ slug, onClose }: Props) {
         </div>
 
         <p className="modal-desc">
-          Sign a free message with the wallet that registered <code className="inline-code">{slug}</code> to
-          install a new upstream API key. It's sandbox-tested against your registered YAML before storing —
+          {isEmailUser
+            ? <>We sign for you — no wallet needed — to install a new upstream API key for </>
+            : <>Sign a free message with the wallet that registered </>}
+          <code className="inline-code">{slug}</code>
+          {isEmailUser ? '. ' : ' to install a new upstream API key. '}
+          It's sandbox-tested against your registered YAML before storing —
           if it fails, nothing changes and your current key keeps serving traffic.
         </p>
 

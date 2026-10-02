@@ -7,9 +7,10 @@ import AppBackground from './AppBackground';
 import Header from './Header';
 import Spinner from './Spinner';
 import ContractRegister from './ContractRegister';
+import { apiFetch, errorMessage } from '../lib/api';
 import type { MinerRecordApi } from '../wasmAbi';
 
-// /api/miners/{id} (proxied via /api/registrations/by-id/[id]) returns snake_case
+// /api/miners/{id} (proxied via the backend's /registrations/by-id/:id) returns snake_case
 // fields, unlike the Go-cased MinerRecordApi shape used everywhere else in the UI.
 interface MinerByIdApi {
   registration_id: number;
@@ -54,9 +55,9 @@ export default function EditMinerPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/registrations/by-id/${params.id}`);
+        const res = await apiFetch(`/registrations/by-id/${params.id}`);
         const data = await res.json();
-        if (!res.ok) { if (!cancelled) setError(data.error || 'Could not load this registration.'); return; }
+        if (!res.ok) { if (!cancelled) setError(errorMessage(data, 'Could not load this registration.')); return; }
         if (!cancelled) setRecord(toMinerRecordApi(data.miner ?? data));
       } catch {
         if (!cancelled) setError('Network error loading this registration.');

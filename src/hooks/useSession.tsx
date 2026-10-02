@@ -1,10 +1,13 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { apiFetch, clearToken, getToken, setToken } from '../lib/api';
 
 export interface SessionUser {
-  email: string;
-  walletAddresses: string[];
+  email: string | null;
+  primaryAuth: 'EMAIL' | 'WALLET';
+  smartWalletAddress: string | null;
+  walletAddress: string | null;
   country: string | null;
   firstName: string | null;
   lastName: string | null;
@@ -16,6 +19,8 @@ export interface SessionUser {
 interface SessionContextValue {
   user: SessionUser | null;
   isLoading: boolean;
+  /** Stores a fresh access token (from login/signup/SIWE) and reloads the session. */
+  signIn: (accessToken: string) => Promise<void>;
   refetch: () => void;
   logout: () => Promise<void>;
 }
@@ -27,12 +32,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSession = useCallback(async () => {
+    if (!getToken()) {
+      setUser(null);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await apiFetch('/auth/me');
       if (res.ok) {
         setUser(await res.json());
       } else {
+        if (res.status === 401) clearToken();
         setUser(null);
       }
     } catch {
@@ -46,12 +57,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     fetchSession();
   }, [fetchSession]);
 
+  const signIn = useCallback(
+    async (accessToken: string) => {
+      setToken(accessToken);
+      await fetchSession();
+    },
+    [fetchSession],
+  );
+
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    clearToken();
     setUser(null);
   }, []);
 
-  const value = useMemo(() => ({ user, isLoading, refetch: fetchSession, logout }), [user, isLoading, fetchSession, logout]);
+  const value = useMemo(
+    () => ({ user, isLoading, signIn, refetch: fetchSession, logout }),
+    [user, isLoading, signIn, fetchSession, logout],
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

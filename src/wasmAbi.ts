@@ -7,6 +7,7 @@ export const intentRegistryAbi = [
       { name: 'wasmHash', type: 'bytes32' },
       { name: 'wasmUrl', type: 'string' },
       { name: 'intent', type: 'string' },
+      { name: 'feeAddress', type: 'address' },
     ],
     outputs: [{ name: 'registrationId', type: 'uint256' }],
   },

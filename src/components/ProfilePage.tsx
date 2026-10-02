@@ -3,18 +3,18 @@
 import { useRouter } from 'nextjs-toploader/app';
 import AppBackground from './AppBackground';
 import Header from './Header';
-import LinkWalletCard from './LinkWalletCard';
+import AccountWalletCard from './AccountWalletCard';
 import ProfileDetailsCard from './ProfileDetailsCard';
 import CountryFlag from './CountryFlag';
 import { countryName } from '../countries';
 import { useSession } from '../hooks/useSession';
 
-function initialsFor(name: string, email: string): string {
+function initialsFor(name: string, identifier: string): string {
   if (name.trim()) {
     const parts = name.trim().split(/\s+/);
     return (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase();
   }
-  return email.slice(0, 2).toUpperCase();
+  return identifier.replace(/^0x/i, '').slice(0, 2).toUpperCase();
 }
 
 export default function ProfilePage() {
@@ -22,6 +22,8 @@ export default function ProfilePage() {
   const { user } = useSession();
 
   const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : '';
+  const identifier = user ? (user.email ?? user.walletAddress ?? '') : '';
+  const shortIdentifier = user?.email ?? (identifier ? `${identifier.slice(0, 6)}…${identifier.slice(-4)}` : '');
 
   return (
     <div className="app">
@@ -31,17 +33,17 @@ export default function ProfilePage() {
         <div className="dashboard-body">
           {user && (
             <div className="profile-hero">
-              <div className="profile-avatar">{initialsFor(displayName, user.email)}</div>
+              <div className="profile-avatar">{initialsFor(displayName, identifier)}</div>
               <div className="profile-hero-info">
-                <span className="profile-hero-name">{displayName || user.email}</span>
-                {displayName && <span className="profile-hero-email">{user.email}</span>}
+                <span className="profile-hero-name">{displayName || shortIdentifier}</span>
+                {displayName && <span className="profile-hero-email">{shortIdentifier}</span>}
                 <div className="profile-hero-chips">
                   {user.country && (
                     <span className="profile-chip"><CountryFlag code={user.country} /> {countryName(user.country)}</span>
                   )}
-                  <span className={`profile-chip ${user.walletAddresses?.length ? 'profile-chip-on' : ''}`}>
-                    <span className={`profile-status-dot ${user.walletAddresses?.length ? 'profile-status-dot-on' : ''}`} />
-                    {user.walletAddresses?.length ? 'Wallet Linked' : 'No Wallet Linked'}
+                  <span className="profile-chip profile-chip-on">
+                    <span className="profile-status-dot profile-status-dot-on" />
+                    {user.primaryAuth === 'EMAIL' ? 'Email account' : 'Wallet account'}
                   </span>
                 </div>
               </div>
@@ -59,7 +61,7 @@ export default function ProfilePage() {
           {user && (
             <div className="register-card register-card-full profile-card">
               <ProfileDetailsCard />
-              <LinkWalletCard />
+              <AccountWalletCard />
             </div>
           )}
         </div>

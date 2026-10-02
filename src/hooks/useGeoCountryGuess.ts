@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
 
 /** Best-effort IP-based country guess to prefill (not lock) the country selector. */
 export function useGeoCountryGuess(): string | null {
@@ -8,7 +9,7 @@ export function useGeoCountryGuess(): string | null {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/geo')
+    apiFetch('/geo')
       .then(res => (res.ok ? res.json() : null))
       .then(data => { if (!cancelled && data?.country) setGuess(data.country); })
       .catch(() => {});

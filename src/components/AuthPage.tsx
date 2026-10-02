@@ -1,14 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useRouter } from 'nextjs-toploader/app';
+import { useAccount, useSignMessage } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
 import AppBackground from './AppBackground';
-import CountrySelect from './CountrySelect';
 import { useSession } from '../hooks/useSession';
-import { useGeoCountryGuess } from '../hooks/useGeoCountryGuess';
+import { apiPost, errorMessage } from '../lib/api';
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordRules';
 import { fireSignupConversion } from '../lib/xPixel';
 
@@ -32,7 +33,9 @@ function EyeIcon({ open }: { open: boolean }) {
 export default function AuthPage() {
   const toast = useToast();
   const router = useRouter();
-  const { refetch: refetchSession } = useSession();
+  const { signIn } = useSession();
+  const { address, isConnected } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const searchParams = useSearchParams();
 
   const initialTab: Tab = searchParams.get('tab') === 'signup' ? 'signup' : 'login';
@@ -46,19 +49,11 @@ export default function AuthPage() {
   // Signup state
   const [signupPhase, setSignupPhase] = useState<SignupPhase>('email');
   const [signupEmail, setSignupEmail] = useState('');
-  const [signupToken, setSignupToken] = useState('');
   const [otp, setOtp] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
   const [showSignupPassword, setShowSignupPassword] = useState(false);
-  const [signupCountry, setSignupCountry] = useState('');
   const [signupBusy, setSignupBusy] = useState(false);
   const [signupError, setSignupError] = useState('');
-
-  const geoGuess = useGeoCountryGuess();
-  useEffect(() => {
-    if (geoGuess && !signupCountry) setSignupCountry(geoGuess);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [geoGuess]);
 
   // Login state
   const [loginEmail, setLoginEmail] = useState('');
@@ -66,13 +61,11 @@ export default function AuthPage() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
-  const [magicSent, setMagicSent] = useState(false);
-  const [magicBusy, setMagicBusy] = useState(false);
+  const [walletBusy, setWalletBusy] = useState(false);
 
   // Forgot-password state — null means not in reset mode (showing the normal login form)
   const [resetPhase, setResetPhase] = useState<'email' | 'code' | null>(null);
   const [resetEmail, setResetEmail] = useState('');
-  const [resetToken, setResetToken] = useState('');
   const [resetOtp, setResetOtp] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
@@ -82,16 +75,14 @@ export default function AuthPage() {
   const handleRequestOtp = async () => {
     setSignupError('');
     if (!signupEmail.trim()) { setSignupError('Enter your email.'); return; }
+    if (!signupPassword) { setSignupError('Choose a password.'); return; }
+    const passwordError = validatePasswordStrength(signupPassword);
+    if (passwordError) { setSignupError(passwordError); return; }
     setSignupBusy(true);
     try {
-      const res = await fetch('/api/auth/signup/request-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: signupEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setSignupError(data.error || 'Could not send code.'); return; }
-      setSignupToken(data.token);
+      const res = await apiPost('/auth/signup/email', { email: signupEmail.trim(), password: signupPassword });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setSignupError(errorMessage(data, 'Could not send code.')); return; }
       setSignupPhase('code');
       toast.success('Verification code sent — check your inbox.');
     } catch {
@@ -103,22 +94,15 @@ export default function AuthPage() {
 
   const handleVerifyOtp = async () => {
     setSignupError('');
-    if (!otp.trim() || !signupPassword) { setSignupError('Enter the code and a password.'); return; }
-    if (!signupCountry) { setSignupError('Select your country.'); return; }
-    const passwordError = validatePasswordStrength(signupPassword);
-    if (passwordError) { setSignupError(passwordError); return; }
+    if (!otp.trim()) { setSignupError('Enter the verification code.'); return; }
     setSignupBusy(true);
     try {
-      const res = await fetch('/api/auth/signup/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: signupToken, otp: otp.trim(), password: signupPassword, country: signupCountry }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setSignupError(data.error || 'Could not verify code.'); return; }
+      const res = await apiPost('/auth/signup/verify-otp', { email: signupEmail.trim(), code: otp.trim() });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setSignupError(errorMessage(data, 'Could not verify code.')); return; }
       toast.success('Account created.');
       fireSignupConversion();
-      refetchSession();
+      await signIn(data.accessToken);
       goNext();
     } catch {
       setSignupError('Network error. Please try again.');
@@ -132,15 +116,11 @@ export default function AuthPage() {
     if (!loginEmail.trim() || !loginPassword) { setLoginError('Enter your email and password.'); return; }
     setLoginBusy(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim(), password: loginPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setLoginError(data.error || 'Could not sign in.'); return; }
+      const res = await apiPost('/auth/login/email', { email: loginEmail.trim(), password: loginPassword });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setLoginError(errorMessage(data, 'Could not sign in.')); return; }
       toast.success('Signed in.');
-      refetchSession();
+      await signIn(data.accessToken);
       goNext();
     } catch {
       setLoginError('Network error. Please try again.');
@@ -149,26 +129,29 @@ export default function AuthPage() {
     }
   };
 
-  const handleMagicLink = async () => {
+  // Sign-In With Ethereum: the backend builds the message, the wallet signs it, the backend verifies it and issues the token.
+  const handleWalletSignIn = async () => {
+    if (!address) return;
     setLoginError('');
-    if (!loginEmail.trim()) { setLoginError('Enter your email first.'); return; }
-    setMagicBusy(true);
+    setWalletBusy(true);
     try {
-      const res = await fetch('/api/auth/magic-link/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: loginEmail.trim() }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setLoginError(data.error || 'Could not send link. Please try again.');
-        return;
-      }
-      setMagicSent(true);
+      const msgRes = await apiPost('/auth/wallet/message', { address });
+      const msgData = await msgRes.json().catch(() => null);
+      if (!msgRes.ok) { setLoginError(errorMessage(msgData, 'Could not start wallet sign-in.')); return; }
+
+      const signature = await signMessageAsync({ message: msgData.message });
+
+      const verifyRes = await apiPost('/auth/wallet/verify', { message: msgData.message, signature, nonceId: msgData.nonceId });
+      const verifyData = await verifyRes.json().catch(() => null);
+      if (!verifyRes.ok) { setLoginError(errorMessage(verifyData, 'Could not verify signature.')); return; }
+
+      toast.success('Signed in with wallet.');
+      await signIn(verifyData.accessToken);
+      goNext();
     } catch {
-      setLoginError('Network error. Please try again.');
+      setLoginError('Wallet sign-in cancelled or failed.');
     } finally {
-      setMagicBusy(false);
+      setWalletBusy(false);
     }
   };
 
@@ -183,16 +166,11 @@ export default function AuthPage() {
     if (!resetEmail.trim()) { setResetError('Enter your email.'); return; }
     setResetBusy(true);
     try {
-      const res = await fetch('/api/auth/password-reset/request-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setResetError(data.error || 'Could not send code.'); return; }
-      setResetToken(data.token);
+      const res = await apiPost('/auth/password/forgot', { email: resetEmail.trim() });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setResetError(errorMessage(data, 'Could not send code.')); return; }
       setResetPhase('code');
-      toast.success('Reset code sent — check your inbox.');
+      toast.success('If that email has an account, a reset code is on its way.');
     } catch {
       setResetError('Network error. Please try again.');
     } finally {
@@ -207,13 +185,9 @@ export default function AuthPage() {
     if (passwordError) { setResetError(passwordError); return; }
     setResetBusy(true);
     try {
-      const res = await fetch('/api/auth/password-reset/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: resetToken, otp: resetOtp.trim(), password: resetPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setResetError(data.error || 'Could not reset password.'); return; }
+      const res = await apiPost('/auth/password/reset', { email: resetEmail.trim(), code: resetOtp.trim(), newPassword: resetPassword });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setResetError(errorMessage(data, 'Could not reset password.')); return; }
       toast.success('Password reset — sign in with your new password.');
       setResetPhase(null);
       setLoginEmail(resetEmail);
@@ -278,32 +252,6 @@ export default function AuthPage() {
                   onChange={e => setSignupEmail(e.target.value)}
                   autoFocus
                 />
-                {signupError && <p className="field-error">{signupError}</p>}
-                <button
-                  type="button"
-                  className={`btn-fill btn-full ${signupBusy ? 'btn-loading' : ''}`}
-                  onClick={handleRequestOtp}
-                  disabled={signupBusy}
-                  style={{ marginTop: 8 }}
-                >
-                  {signupBusy ? <><Spinner /> Sending…</> : 'Send verification code'}
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="field-hint" style={{ marginBottom: 12 }}>
-                  Enter the code sent to <span className="result-mono">{signupEmail}</span> and choose a password.
-                </p>
-                <label className="field-label">Verification code</label>
-                <input
-                  className="field-input field-mono"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder="123456"
-                  value={otp}
-                  onChange={e => setOtp(e.target.value)}
-                  autoFocus
-                />
                 <label className="field-label" style={{ marginTop: 12 }}>Password</label>
                 <div className="field-password-wrap">
                   <input
@@ -324,12 +272,32 @@ export default function AuthPage() {
                   </button>
                 </div>
                 <p className="field-hint" style={{ marginTop: 4 }}>{PASSWORD_REQUIREMENTS_TEXT}</p>
-                <label className="field-label" style={{ marginTop: 12 }}>Country <span className="field-required">*</span></label>
-                <CountrySelect value={signupCountry} onChange={setSignupCountry} />
-                <p className="field-hint" style={{ marginTop: 4 }}>
-                  {geoGuess ? 'Auto-detected from your location — confirm or change it. ' : ''}
-                  Required — cannot be changed after your account is created.
+                {signupError && <p className="field-error">{signupError}</p>}
+                <button
+                  type="button"
+                  className={`btn-fill btn-full ${signupBusy ? 'btn-loading' : ''}`}
+                  onClick={handleRequestOtp}
+                  disabled={signupBusy}
+                  style={{ marginTop: 8 }}
+                >
+                  {signupBusy ? <><Spinner /> Sending…</> : 'Send verification code'}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="field-hint" style={{ marginBottom: 12 }}>
+                  Enter the code sent to <span className="result-mono">{signupEmail}</span> to finish creating your account.
                 </p>
+                <label className="field-label">Verification code</label>
+                <input
+                  className="field-input field-mono"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={otp}
+                  onChange={e => setOtp(e.target.value)}
+                  autoFocus
+                />
                 {signupError && <p className="field-error">{signupError}</p>}
                 <button
                   type="button"
@@ -446,7 +414,7 @@ export default function AuthPage() {
               type="email"
               placeholder="you@example.com"
               value={loginEmail}
-              onChange={e => { setLoginEmail(e.target.value); setMagicSent(false); }}
+              onChange={e => setLoginEmail(e.target.value)}
               autoFocus
             />
             <label className="field-label" style={{ marginTop: 12 }}>Password</label>
@@ -484,14 +452,27 @@ export default function AuthPage() {
               <button type="button" className="inline-link-btn" onClick={openForgotPassword}>
                 Forgot password?
               </button>
-              {magicSent ? (
-                <p className="field-hint">Check <span className="result-mono">{loginEmail}</span> for a sign-in link.</p>
-              ) : (
-                <button type="button" className="inline-link-btn" onClick={handleMagicLink} disabled={magicBusy}>
-                  {magicBusy ? <><Spinner /> Sending…</> : 'Email me a magic link instead'}
-                </button>
-              )}
             </div>
+
+            <div style={{ textAlign: 'center', margin: '18px 0 10px', opacity: 0.5, fontSize: 12 }}>or</div>
+            {!isConnected ? (
+              <ConnectButton.Custom>
+                {({ openConnectModal }) => (
+                  <button type="button" className="btn-ghost btn-full" onClick={openConnectModal}>
+                    Connect a wallet to sign in
+                  </button>
+                )}
+              </ConnectButton.Custom>
+            ) : (
+              <button
+                type="button"
+                className={`btn-ghost btn-full ${walletBusy ? 'btn-loading' : ''}`}
+                onClick={handleWalletSignIn}
+                disabled={walletBusy}
+              >
+                {walletBusy ? <><Spinner /> Waiting for signature…</> : `Sign in with ${address?.slice(0, 6)}…${address?.slice(-4)}`}
+              </button>
+            )}
           </div>
         )}
       </div>

@@ -9,6 +9,8 @@ import Spinner from './Spinner';
 import ApiKeyModal from './ApiKeyModal';
 import { useToast } from './Toast';
 import { useAddressRegistrations } from '../hooks/useAddressRegistrations';
+import { useSession } from '../hooks/useSession';
+import { apiFetch, apiPost, errorMessage } from '../lib/api';
 import {
   DIAMOND_ADDRESS,
   ENTITY_WASM_AUTHOR,
@@ -44,12 +46,15 @@ function statusBadgeClass(status: string): string {
   return 'wasm-status-pending';
 }
 
-function WasmRow({ record, onDeregistered }: {
+function WasmRow({ record, onDeregistered, isEmailUser }: {
   record: WasmRecordApi;
   onDeregistered: () => void;
+  /** Email accounts deregister through the backend (sponsored) instead of a wallet transaction. */
+  isEmailUser: boolean;
 }) {
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
   const { data: receipt, isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: txHash });
 
@@ -77,12 +82,28 @@ function WasmRow({ record, onDeregistered }: {
   }, [confirming]);
 
   const status = record.ActivationStatus;
-  const inFlight = isPending || isConfirming;
+  const inFlight = isPending || isConfirming || emailBusy;
   const deregisterable = status !== 'deregistered';
+
+  const handleEmailDeregister = async () => {
+    setEmailBusy(true);
+    try {
+      const res = await apiPost('/registrations/wasm/deregister', { registrationId: record.RegistrationID });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not deregister this WASM entry.')); return; }
+      toast.success('WASM entry deregistered.');
+      onDeregistered();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setEmailBusy(false);
+    }
+  };
 
   const handleDeregisterClick = () => {
     if (!confirming) { setConfirming(true); return; }
     setConfirming(false);
+    if (isEmailUser) { handleEmailDeregister(); return; }
     reset();
     writeContract({
       address: DIAMOND_ADDRESS,
@@ -126,13 +147,16 @@ function WasmRow({ record, onDeregistered }: {
   );
 }
 
-function MinerRow({ record, onDeregistered, onEdit }: {
+function MinerRow({ record, onDeregistered, onEdit, isEmailUser }: {
   record: MinerRecordApi;
   onDeregistered: () => void;
   onEdit: () => void;
+  /** Email accounts deregister through the backend (sponsored) instead of a wallet transaction. */
+  isEmailUser: boolean;
 }) {
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
   const { writeContract, data: txHash, isPending, error, reset } = useWriteContract();
@@ -162,16 +186,16 @@ function MinerRow({ record, onDeregistered, onEdit }: {
   }, [confirming]);
 
   const status = record.ActivationStatus;
-  const inFlight = isPending || isConfirming;
+  const inFlight = isPending || isConfirming || emailBusy;
   const deregisterable = status !== 'deregistered';
   const keyInstallable = ['active', 'pending', 'unreachable'].includes(status);
 
   const handleCheckStatus = async () => {
     setCheckingStatus(true);
     try {
-      const res = await fetch(`/api/registrations/by-id/${record.RegistrationID}`);
+      const res = await apiFetch(`/registrations/by-id/${record.RegistrationID}`);
       const data = await res.json();
-      if (!res.ok) { toast.error(data.error || 'Could not reach the registry node.'); return; }
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not reach the registry node.')); return; }
       const miner = data.miner ?? data;
       const reason = miner.rejection_reason ? ` — ${miner.rejection_reason}` : '';
       const msg = `Registration #${record.RegistrationID}: ${String(miner.activation_status).toUpperCase()}${reason}`;
@@ -186,9 +210,25 @@ function MinerRow({ record, onDeregistered, onEdit }: {
     }
   };
 
+  const handleEmailDeregister = async () => {
+    setEmailBusy(true);
+    try {
+      const res = await apiPost('/registrations/miner/deregister', { registrationId: record.RegistrationID });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { toast.error(errorMessage(data, 'Could not deregister this miner.')); return; }
+      toast.success('Miner deregistered.');
+      onDeregistered();
+    } catch {
+      toast.error('Network error. Please try again.');
+    } finally {
+      setEmailBusy(false);
+    }
+  };
+
   const handleDeregisterClick = () => {
     if (!confirming) { setConfirming(true); return; }
     setConfirming(false);
+    if (isEmailUser) { handleEmailDeregister(); return; }
     reset();
     writeContract({
       address: DIAMOND_ADDRESS,
@@ -261,7 +301,12 @@ function MinerRow({ record, onDeregistered, onEdit }: {
 
 export default function Dashboard() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address: walletAddress, isConnected: walletConnected } = useAccount();
+  const { user } = useSession();
+  // Email accounts own registrations through their backend-managed smart wallet; wallet accounts through the connected wallet.
+  const isEmailUser = user?.primaryAuth === 'EMAIL';
+  const address = isEmailUser ? (user?.smartWalletAddress ?? undefined) : walletAddress;
+  const isConnected = isEmailUser ? !!user?.smartWalletAddress : walletConnected;
   const [tab, setTab] = useState<Tab>('wasm');
   const [page, setPage] = useState(1);
   const { miners, wasm, isLoading, error, refetch } = useAddressRegistrations(address);
@@ -301,7 +346,8 @@ export default function Dashboard() {
           <p className="step-desc">
             {isConnected
               ? <>Everything registered on-chain by <span className="result-mono">{address}</span>, sourced live from the registry.</>
-              : 'Connect your wallet to view your registered items.'}
+              : 'Sign in with email, or connect your wallet, to view your registered items.'}
+            {isEmailUser && <> Changes you make as an email account are sent for you, with gas sponsored.</>}
           </p>
         </div>
 
@@ -359,8 +405,8 @@ export default function Dashboard() {
 
         {!isConnected ? (
           <div className="dashboard-empty">
-            <p className="dashboard-empty-title">Wallet not connected</p>
-            <p className="dashboard-empty-desc">Connect your wallet to view your registrations.</p>
+            <p className="dashboard-empty-title">Not signed in</p>
+            <p className="dashboard-empty-desc">Sign in with email, or connect your wallet, to view your registrations.</p>
           </div>
         ) : error ? (
           <div className="dashboard-empty">
@@ -384,7 +430,7 @@ export default function Dashboard() {
             <>
               <div className="reg-list">
                 {(pageRecords as WasmRecordApi[]).map(r => (
-                  <WasmRow key={r.RegistrationID} record={r} onDeregistered={refetch} />
+                  <WasmRow key={r.RegistrationID} record={r} onDeregistered={refetch} isEmailUser={isEmailUser} />
                 ))}
               </div>
               <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />
@@ -399,7 +445,7 @@ export default function Dashboard() {
           <>
             <div className="reg-list">
               {(pageRecords as MinerRecordApi[]).map(r => (
-                <MinerRow key={r.RegistrationID} record={r} onDeregistered={refetch} onEdit={() => router.push(`/register/edit/${r.RegistrationID}`)} />
+                <MinerRow key={r.RegistrationID} record={r} isEmailUser={isEmailUser} onDeregistered={refetch} onEdit={() => router.push(`/register/edit/${r.RegistrationID}`)} />
               ))}
             </div>
             <Pagination page={currentPage} totalPages={totalPages} onChange={setPage} />

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
 import type { LeaderboardEntry, LeaderboardResponse } from '../wasmAbi';
 
 interface CachedLeaderboard {
@@ -53,7 +54,7 @@ export function useLeaderboard(limit = 10): {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/leaderboard/miners?limit=${limit}`);
+      const res = await apiFetch(`/leaderboard/miners?limit=${limit}`);
       if (!res.ok) throw new Error(`Node returned HTTP ${res.status}`);
       const data = (await res.json()) as LeaderboardResponse;
       const fresh = { byIntent: data.intents ?? {}, epoch: data.epoch ?? null };

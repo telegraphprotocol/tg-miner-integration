@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { apiFetch } from '../lib/api';
 import type { AddressBundleResponse, MinerRecordApi, WasmRecordApi } from '../wasmAbi';
 
 export function useAddressRegistrations(address: string | undefined): {
@@ -24,7 +25,7 @@ export function useAddressRegistrations(address: string | undefined): {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/registrations/${address}`);
+      const res = await apiFetch(`/registrations/address/${address}`);
       if (!res.ok) throw new Error(`Node returned HTTP ${res.status}`);
       const data = (await res.json()) as AddressBundleResponse;
       setMiners(data.miners ?? []);
