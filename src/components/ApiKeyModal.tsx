@@ -224,10 +224,10 @@ export default function ApiKeyModal({ slug, onClose }: Props) {
                   display: 'flex', alignItems: 'center', gap: 8,
                   fontSize: 12, fontFamily: 'var(--font-mono, monospace)',
                   padding: '6px 10px', borderRadius: 6,
-                  background: r.success ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
-                  border: `1px solid ${r.success ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                  background: r.success ? 'rgba(255,255,255,0.05)' : 'rgba(239,68,68,0.07)',
+                  border: `1px solid ${r.success ? '#2a2a2a' : 'rgba(239,68,68,0.2)'}`,
                 }}>
-                  <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: 8 }}>
+                  <span style={{ color: r.success ? '#e9e9e9' : '#ef4444', fontWeight: 600, minWidth: 8 }}>
                     {r.success ? '✓' : '✗'}
                   </span>
                   <span style={{ opacity: 0.6, minWidth: 36 }}>{r.method}</span>

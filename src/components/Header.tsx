@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'nextjs-toploader/app';
-import WalletBar from './WalletBar';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
 import type { Step } from '../types';
@@ -57,7 +56,6 @@ export default function Header({ step, onBack }: Props) {
       <div className="app-header-right">
         <ExternalLinksNav mode="dropdown" />
         <AccountButton />
-        <WalletBar />
       </div>
     </header>
   );
