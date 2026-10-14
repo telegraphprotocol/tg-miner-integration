@@ -18,12 +18,12 @@ import {
 import { addWasmRegistration } from '../registrationsStore';
 import { useCanonicalIntents } from '../hooks/useCanonicalIntents';
 import { useToast } from './Toast';
-import WalletBar from './WalletBar';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Spinner from './Spinner';
 import IntentSearchList from './IntentSearchList';
-import { usePathname } from 'next/navigation';
 import { useRouter } from 'nextjs-toploader/app';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 import { apiFetch, apiPost, errorMessage } from '../lib/api';
 
 const BASE_SEPOLIA_EXPLORER = 'https://sepolia.basescan.org';
@@ -36,7 +36,7 @@ export default function WasmWizard() {
   const { address, isConnected, chain } = useAccount();
   const { switchChain, isPending: isSwitching } = useSwitchChain();
   const router = useRouter();
-  const pathname = usePathname();
+  const { openLogin } = useAuthModal();
   const { user, isLoading: sessionLoading } = useSession();
   // Email accounts register through the backend (gas sponsored); wallet accounts sign in their own wallet.
   const isEmailUser = user?.primaryAuth === 'EMAIL';
@@ -438,7 +438,13 @@ export default function WasmWizard() {
               ) : !isConnected ? (
                 <div className="wallet-disconnected">
                   <p className="wallet-disconnected-text">Connect your wallet to proceed.</p>
-                  <WalletBar />
+                  <ConnectButton.Custom>
+                    {({ openConnectModal }) => (
+                      <button type="button" className="wallet-pill wallet-pill-primary" onClick={openConnectModal}>
+                        Connect
+                      </button>
+                    )}
+                  </ConnectButton.Custom>
                 </div>
               ) : wrongNetwork ? (
                 <div className="wallet-disconnected">
@@ -463,7 +469,7 @@ export default function WasmWizard() {
                       <button
                         type="button"
                         className="wallet-pill wallet-pill-accent"
-                        onClick={() => router.push(`/login?tab=login&next=${encodeURIComponent(pathname)}`)}
+                        onClick={() => openLogin()}
                       >
                         Login
                       </button>

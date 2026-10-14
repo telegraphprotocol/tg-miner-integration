@@ -3,21 +3,21 @@
 import { useRouter } from 'nextjs-toploader/app';
 import { emitIntentSignal } from '../hooks/useIntentSignal';
 import { fireTrack3RegisterConversion } from '../lib/xPixel';
-import WalletBar from './WalletBar';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 
 const REASON = 'You need to register in order to progress';
 
 export default function Track3Page() {
   const router = useRouter();
   const { user } = useSession();
+  const { openLogin } = useAuthModal();
 
-  const requireAuth = (next: string): boolean => {
-    if (user) return true;
-    router.push(`/login?tab=signup&reason=${encodeURIComponent(REASON)}&next=${encodeURIComponent(next)}`);
-    return false;
+  const requireAuth = (action: () => void) => {
+    if (user) action();
+    else openLogin({ tab: 'signup', reason: REASON, onSuccess: action });
   };
 
   return (
@@ -35,7 +35,6 @@ export default function Track3Page() {
         <div className="lv2-nav-links">
           <ExternalLinksNav mode="inline" />
           <AccountButton />
-          <WalletBar />
         </div>
       </nav>
 
@@ -65,7 +64,7 @@ export default function Track3Page() {
                 onClick={() => {
                   emitIntentSignal();
                   fireTrack3RegisterConversion();
-                  router.push('/login?tab=signup');
+                  openLogin({ tab: 'signup' });
                 }}
               >
                 Register Now →
@@ -77,7 +76,7 @@ export default function Track3Page() {
               className="lv2-hero-cta-secondary"
               onClick={() => {
                 emitIntentSignal();
-                if (requireAuth('/integrate')) router.push('/integrate');
+                requireAuth(() => router.push('/integrate'));
               }}
             >
               Consume Intelligence →

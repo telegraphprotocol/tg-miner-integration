@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import NextTopLoader from 'nextjs-toploader';
 import { ToastProvider } from './Toast';
 import { SessionProvider } from '../hooks/useSession';
+import { AuthModalProvider } from './AuthModalProvider';
 import SignupNudge from './SignupNudge';
 import RequiredProfileModal from './RequiredProfileModal';
 
@@ -17,9 +18,11 @@ export default function GlobalProviders({ children }: { children: ReactNode }) {
     <SessionProvider>
       <ToastProvider>
         <NextTopLoader color="#ffffff" showSpinner={false} height={2} shadow="0 0 10px rgba(255,255,255,0.5)" />
-        {children}
-        <SignupNudge />
-        <RequiredProfileModal />
+        <AuthModalProvider>
+          {children}
+          <SignupNudge />
+          <RequiredProfileModal />
+        </AuthModalProvider>
       </ToastProvider>
     </SessionProvider>
   );

@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'nextjs-toploader/app';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 import { useIntentSignal } from '../hooks/useIntentSignal';
 
 const FIRST_DELAY_MS = 25_000;
@@ -27,7 +27,7 @@ function writeShowCount(n: number): void {
 }
 
 export default function SignupNudge() {
-  const router = useRouter();
+  const { openLogin } = useAuthModal();
   const { user, isLoading } = useSession();
   const [visible, setVisible] = useState(false);
   const showCountRef = useRef(0);
@@ -50,7 +50,7 @@ export default function SignupNudge() {
 
   const dismiss = (opts?: { convert?: boolean }) => {
     setVisible(false);
-    if (opts?.convert) router.push('/login?tab=signup');
+    if (opts?.convert) openLogin({ tab: 'signup' });
     scheduleNext();
   };
 

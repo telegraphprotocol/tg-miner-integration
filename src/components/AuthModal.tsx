@@ -1,13 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { useRouter } from 'nextjs-toploader/app';
-import { useAccount, useSignMessage } from 'wagmi';
+import { useEffect, useRef, useState } from 'react';
+import { useAccount, useDisconnect, useSignMessage, useSwitchChain } from 'wagmi';
+import { baseSepolia } from 'wagmi/chains';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useToast } from './Toast';
 import Spinner from './Spinner';
-import AppBackground from './AppBackground';
 import { useSession } from '../hooks/useSession';
 import { apiPost, errorMessage } from '../lib/api';
 import { validatePasswordStrength, PASSWORD_REQUIREMENTS_TEXT } from '../lib/passwordRules';
@@ -30,21 +28,24 @@ function EyeIcon({ open }: { open: boolean }) {
   );
 }
 
-export default function AuthPage() {
+interface AuthModalProps {
+  initialTab: Tab;
+  reason?: string;
+  onClose: () => void;
+  /** Runs after a successful sign-in/sign-up; the caller decides whether to close the modal. */
+  onSuccess: () => void;
+}
+
+export default function AuthModal({ initialTab, reason, onClose, onSuccess }: AuthModalProps) {
   const toast = useToast();
-  const router = useRouter();
   const { signIn } = useSession();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
+  const { disconnect } = useDisconnect();
   const { signMessageAsync } = useSignMessage();
-  const searchParams = useSearchParams();
+  const { switchChainAsync } = useSwitchChain();
 
-  const initialTab: Tab = searchParams.get('tab') === 'signup' ? 'signup' : 'login';
-  const reason = searchParams.get('reason');
-  const next = searchParams.get('next');
-
+  const [method, setMethod] = useState<'email' | 'wallet'>('email');
   const [tab, setTab] = useState<Tab>(initialTab);
-
-  const goNext = () => router.push(next ? decodeURIComponent(next) : '/');
 
   // Signup state
   const [signupPhase, setSignupPhase] = useState<SignupPhase>('email');
@@ -62,6 +63,7 @@ export default function AuthPage() {
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
   const [walletBusy, setWalletBusy] = useState(false);
+  const [walletError, setWalletError] = useState('');
 
   // Forgot-password state — null means not in reset mode (showing the normal login form)
   const [resetPhase, setResetPhase] = useState<'email' | 'code' | null>(null);
@@ -103,7 +105,7 @@ export default function AuthPage() {
       toast.success('Account created.');
       fireSignupConversion();
       await signIn(data.accessToken);
-      goNext();
+      onSuccess();
     } catch {
       setSignupError('Network error. Please try again.');
     } finally {
@@ -121,7 +123,7 @@ export default function AuthPage() {
       if (!res.ok) { setLoginError(errorMessage(data, 'Could not sign in.')); return; }
       toast.success('Signed in.');
       await signIn(data.accessToken);
-      goNext();
+      onSuccess();
     } catch {
       setLoginError('Network error. Please try again.');
     } finally {
@@ -132,28 +134,45 @@ export default function AuthPage() {
   // Sign-In With Ethereum: the backend builds the message, the wallet signs it, the backend verifies it and issues the token.
   const handleWalletSignIn = async () => {
     if (!address) return;
-    setLoginError('');
+    setWalletError('');
     setWalletBusy(true);
     try {
       const msgRes = await apiPost('/auth/wallet/message', { address });
       const msgData = await msgRes.json().catch(() => null);
-      if (!msgRes.ok) { setLoginError(errorMessage(msgData, 'Could not start wallet sign-in.')); return; }
+      if (!msgRes.ok) { setWalletError(errorMessage(msgData, 'Could not start wallet sign-in.')); return; }
 
       const signature = await signMessageAsync({ message: msgData.message });
 
       const verifyRes = await apiPost('/auth/wallet/verify', { message: msgData.message, signature, nonceId: msgData.nonceId });
       const verifyData = await verifyRes.json().catch(() => null);
-      if (!verifyRes.ok) { setLoginError(errorMessage(verifyData, 'Could not verify signature.')); return; }
+      if (!verifyRes.ok) { setWalletError(errorMessage(verifyData, 'Could not verify signature.')); return; }
 
       toast.success('Signed in with wallet.');
       await signIn(verifyData.accessToken);
-      goNext();
+      onSuccess();
     } catch {
-      setLoginError('Wallet sign-in cancelled or failed.');
+      setWalletError('Wallet sign-in cancelled or failed.');
     } finally {
       setWalletBusy(false);
     }
   };
+
+  // Once a wallet connects on the Wallet tab: move it to Base Sepolia, then ask for the sign-in signature.
+  // Each connected address is attempted once, so a rejected signature shows "Retry" instead of re-prompting.
+  const autoAttempted = useRef<string | null>(null);
+  useEffect(() => {
+    if (method !== 'wallet' || !isConnected || !address) {
+      if (!isConnected) autoAttempted.current = null;
+      return;
+    }
+    if (autoAttempted.current === address) return;
+    autoAttempted.current = address;
+    (async () => {
+      if (chainId !== baseSepolia.id) await switchChainAsync({ chainId: baseSepolia.id }).catch(() => undefined);
+      await handleWalletSignIn();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method, isConnected, address]);
 
   const openForgotPassword = () => {
     setResetError('');
@@ -201,23 +220,65 @@ export default function AuthPage() {
     }
   };
 
-  return (
-    <div className="auth-page">
-      <AppBackground />
-      <button type="button" className="auth-page-logo" onClick={() => router.push('/')}>
-        <img src="/logo.png" alt="Telegraph" className="lv2-logo-img" />
-        <span className="lv2-logo-text">TELEGRAPH</span>
-      </button>
+  const walletPanel = (
+    <div className="field-group">
+      <p className="field-hint" style={{ marginBottom: 12 }}>
+        Sign a message to authenticate — no gas fees, no transaction. New wallets get an account automatically.
+      </p>
+      {!isConnected ? (
+        <ConnectButton.Custom>
+          {({ openConnectModal }) => (
+            <button type="button" className="btn-fill btn-full" onClick={openConnectModal}>
+              Connect Wallet
+            </button>
+          )}
+        </ConnectButton.Custom>
+      ) : (
+        <>
+          <div className="wallet-info-row">
+            <span className="result-row-label">WALLET</span>
+            <span className="result-row-value result-mono">{address?.slice(0, 6)}…{address?.slice(-4)}</span>
+          </div>
+          {walletError && <p className="field-error">{walletError}</p>}
+          <button
+            type="button"
+            className={`btn-fill btn-full ${walletBusy ? 'btn-loading' : ''}`}
+            onClick={handleWalletSignIn}
+            disabled={walletBusy}
+            style={{ marginTop: 8 }}
+          >
+            {walletBusy ? <><Spinner /> Check your wallet…</> : walletError ? 'Retry' : 'Sign to authenticate'}
+          </button>
+          <button
+            type="button"
+            className="inline-link-btn"
+            style={{ marginTop: 10 }}
+            onClick={() => { setWalletError(''); disconnect(); }}
+          >
+            Use a different wallet
+          </button>
+        </>
+      )}
+    </div>
+  );
 
-      <div className="auth-page-panel modal-panel modal-auth">
+  return (
+    <div className="modal-bd" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-panel modal-auth">
         <div className="modal-header">
           <div className="modal-header-left">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
               <circle cx="12" cy="7" r="4" />
             </svg>
-            <span>{tab === 'signup' ? 'Create Account' : 'Sign In'}</span>
+            <span>{method === 'email' && tab === 'signup' ? 'Create Account' : 'Sign In'}</span>
           </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         {reason && <p className="required-profile-banner">{reason}</p>}
@@ -225,21 +286,40 @@ export default function AuthPage() {
         <div className="sub-tabs" style={{ marginBottom: 20 }}>
           <button
             type="button"
-            className={`sub-tab ${tab === 'login' ? 'sub-tab-active' : ''}`}
-            onClick={() => setTab('login')}
+            className={`sub-tab ${method === 'email' ? 'sub-tab-active' : ''}`}
+            onClick={() => setMethod('email')}
           >
-            Log In
+            Email
           </button>
           <button
             type="button"
-            className={`sub-tab ${tab === 'signup' ? 'sub-tab-active' : ''}`}
-            onClick={() => setTab('signup')}
+            className={`sub-tab ${method === 'wallet' ? 'sub-tab-active' : ''}`}
+            onClick={() => setMethod('wallet')}
           >
-            Sign Up
+            Wallet
           </button>
         </div>
 
-        {tab === 'signup' ? (
+        {method === 'email' && (
+          <div className="sub-tabs" style={{ marginBottom: 20 }}>
+            <button
+              type="button"
+              className={`sub-tab ${tab === 'login' ? 'sub-tab-active' : ''}`}
+              onClick={() => setTab('login')}
+            >
+              Log In
+            </button>
+            <button
+              type="button"
+              className={`sub-tab ${tab === 'signup' ? 'sub-tab-active' : ''}`}
+              onClick={() => setTab('signup')}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
+
+        {method === 'wallet' ? walletPanel : tab === 'signup' ? (
           <div className="field-group">
             {signupPhase === 'email' ? (
               <>
@@ -453,26 +533,6 @@ export default function AuthPage() {
                 Forgot password?
               </button>
             </div>
-
-            <div style={{ textAlign: 'center', margin: '18px 0 10px', opacity: 0.5, fontSize: 12 }}>or</div>
-            {!isConnected ? (
-              <ConnectButton.Custom>
-                {({ openConnectModal }) => (
-                  <button type="button" className="btn-ghost btn-full" onClick={openConnectModal}>
-                    Connect a wallet to sign in
-                  </button>
-                )}
-              </ConnectButton.Custom>
-            ) : (
-              <button
-                type="button"
-                className={`btn-ghost btn-full ${walletBusy ? 'btn-loading' : ''}`}
-                onClick={handleWalletSignIn}
-                disabled={walletBusy}
-              >
-                {walletBusy ? <><Spinner /> Waiting for signature…</> : `Sign in with ${address?.slice(0, 6)}…${address?.slice(-4)}`}
-              </button>
-            )}
           </div>
         )}
       </div>

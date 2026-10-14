@@ -2,11 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'nextjs-toploader/app';
+import { useDisconnect } from 'wagmi';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 import Spinner from './Spinner';
 
 export default function AccountButton() {
   const router = useRouter();
+  const { openLogin, openProfile } = useAuthModal();
+  const { disconnect } = useDisconnect();
   const { user, isLoading, logout } = useSession();
   const [open, setOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -16,6 +20,7 @@ export default function AccountButton() {
     setLoggingOut(true);
     try {
       await logout();
+      disconnect();
     } finally {
       setLoggingOut(false);
       setOpen(false);
@@ -74,7 +79,7 @@ export default function AccountButton() {
             <button
               type="button"
               className="ext-links-dropdown-item account-dropdown-item"
-              onClick={() => { setOpen(false); router.push('/profile'); }}
+              onClick={() => { setOpen(false); openProfile(); }}
             >
               Profile
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -105,7 +110,7 @@ export default function AccountButton() {
   }
 
   return (
-    <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => router.push('/login?tab=login')}>
+    <button type="button" className="wallet-pill wallet-pill-accent" onClick={() => openLogin()}>
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
         <circle cx="12" cy="7" r="4" />

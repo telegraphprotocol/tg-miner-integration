@@ -5,13 +5,12 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagm
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { baseSepolia } from 'wagmi/chains';
 import { decodeEventLog } from 'viem';
-import { usePathname } from 'next/navigation';
-import { useRouter } from 'nextjs-toploader/app';
 import YamlHashModal from './YamlHashModal';
 import { useToast } from './Toast';
 import { addYamlRegistration } from '../registrationsStore';
 import { parseYamlToForm } from '../yamlParse';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 import { apiFetch, apiPost, errorMessage } from '../lib/api';
 import { friendlyRevertMessage, intentRegistryAbi, type AddressBundleResponse, type MinerRecordApi } from '../wasmAbi';
 
@@ -67,8 +66,7 @@ interface Props {
 export default function ContractRegister({ intents, minPriceUsdc, onBack, editRecord }: Props) {
   const isEdit = !!editRecord;
   const toast = useToast();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { openLogin } = useAuthModal();
   const { address, isConnected, chain } = useAccount();
   const { user, isLoading: sessionLoading } = useSession();
   // Email accounts register through the backend (gas sponsored); wallet accounts sign in their own wallet.
@@ -517,7 +515,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                   <button
                     type="button"
                     className="wallet-pill wallet-pill-accent"
-                    onClick={() => router.push(`/login?tab=login&next=${encodeURIComponent(pathname)}`)}
+                    onClick={() => openLogin()}
                   >
                     Login
                   </button>
@@ -562,7 +560,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                   disabled={isTxInFlight || isSuccess}
                 />
                 {hashIsStale && (
-                  <p className="field-hint" style={{ marginTop: 6, color: 'rgba(255,180,80,0.9)' }}>
+                  <p className="field-hint" style={{ marginTop: 6, color: 'rgba(255,255,255,0.7)' }}>
                     URL changed — the hash below no longer matches it.{' '}
                     <button
                       type="button"
@@ -665,7 +663,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                         {validationErrorsList.map((e, i) => <li key={i}>{e}</li>)}
                       </ul>
                       {!requiresApiKey && validationErrorsList.some(e => /api_key|api key/i.test(e)) && (
-                        <p className="field-hint" style={{ margin: 0, color: 'rgba(255,200,80,0.75)' }}>
+                        <p className="field-hint" style={{ margin: 0, color: 'rgba(255,255,255,0.65)' }}>
                           This endpoint needs a credential — switch on <strong>Requires API Key</strong> above and paste one in.
                         </p>
                       )}
@@ -726,11 +724,11 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                             display: 'flex', flexDirection: 'column', gap: '4px',
                             fontSize: '12px', fontFamily: 'var(--font-mono, monospace)',
                             padding: '6px 10px', borderRadius: '6px',
-                            background: r.success ? 'rgba(34,197,94,0.07)' : 'rgba(239,68,68,0.07)',
-                            border: `1px solid ${r.success ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                            background: r.success ? 'rgba(255,255,255,0.05)' : 'rgba(239,68,68,0.07)',
+                            border: `1px solid ${r.success ? '#2a2a2a' : 'rgba(239,68,68,0.2)'}`,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ color: r.success ? '#22c55e' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
+                              <span style={{ color: r.success ? '#e9e9e9' : '#ef4444', fontWeight: 600, minWidth: '8px' }}>
                                 {r.success ? '✓' : '✗'}
                               </span>
                               <span style={{ opacity: 0.6, minWidth: '36px' }}>{r.method}</span>
@@ -771,7 +769,7 @@ export default function ContractRegister({ intents, minPriceUsdc, onBack, editRe
                     )}
                   </button>
                   {validateState === 'valid' && (
-                    <p className="field-hint" style={{ marginTop: '8px', color: 'rgba(34,197,94,0.85)' }}>
+                    <p className="field-hint" style={{ marginTop: '8px', color: 'rgba(255,255,255,0.85)' }}>
                       ✓ Endpoint validated — ready to register.
                     </p>
                   )}

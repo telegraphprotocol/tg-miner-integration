@@ -1,8 +1,5 @@
 'use client';
 
-import { useRouter } from 'nextjs-toploader/app';
-import AppBackground from './AppBackground';
-import Header from './Header';
 import AccountWalletCard from './AccountWalletCard';
 import ProfileDetailsCard from './ProfileDetailsCard';
 import CountryFlag from './CountryFlag';
@@ -17,8 +14,7 @@ function initialsFor(name: string, identifier: string): string {
   return identifier.replace(/^0x/i, '').slice(0, 2).toUpperCase();
 }
 
-export default function ProfilePage() {
-  const router = useRouter();
+export default function ProfileModal({ onClose }: { onClose: () => void }) {
   const { user } = useSession();
 
   const displayName = user ? [user.firstName, user.lastName].filter(Boolean).join(' ') : '';
@@ -26,11 +22,24 @@ export default function ProfilePage() {
   const shortIdentifier = user?.email ?? (identifier ? `${identifier.slice(0, 6)}…${identifier.slice(-4)}` : '');
 
   return (
-    <div className="app">
-      <AppBackground />
-      <Header onBack={() => router.push('/')} />
-      <div className="app-body">
-        <div className="dashboard-body">
+    <div className="modal-bd" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-panel modal-profile">
+        <div className="modal-header">
+          <div className="modal-header-left">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span>Profile</span>
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Close">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div className="modal-profile-body">
           {user && (
             <div className="profile-hero">
               <div className="profile-avatar">{initialsFor(displayName, identifier)}</div>
@@ -47,14 +56,6 @@ export default function ProfilePage() {
                   </span>
                 </div>
               </div>
-            </div>
-          )}
-
-          {!user && (
-            <div className="step-section-heading">
-              <div className="step-eyebrow">YOUR PROFILE</div>
-              <h2 className="step-title">Profile</h2>
-              <p className="step-desc">Sign in to manage your account.</p>
             </div>
           )}
 

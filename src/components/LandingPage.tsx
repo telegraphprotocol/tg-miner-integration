@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useRouter } from 'nextjs-toploader/app';
 import { emitIntentSignal } from '../hooks/useIntentSignal';
-import WalletBar from './WalletBar';
 import LiveLeaderboard from './LiveLeaderboard';
 import ExternalLinksNav from './ExternalLinksNav';
 import AccountButton from './AccountButton';
 import { useSession } from '../hooks/useSession';
+import { useAuthModal } from './AuthModalProvider';
 
 const CARDS = [
   {
@@ -60,21 +60,22 @@ const REASON = 'You need to register in order to progress';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { user } = useSession();
+  const { user, isLoading } = useSession();
+  const { openLogin } = useAuthModal();
   const [hovered, setHovered] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [choice, setChoice] = useState<Choice>('root');
 
-  const requireAuth = (next: string): boolean => {
-    if (user) return true;
-    router.push(`/login?tab=signup&reason=${encodeURIComponent(REASON)}&next=${encodeURIComponent(next)}`);
-    return false;
+  const requireAuth = (action: () => void) => {
+    if (isLoading) return;
+    if (user) action();
+    else openLogin({ tab: 'signup', reason: REASON, onSuccess: action });
   };
 
   const rootHandlers: Record<string, () => void> = {
-    yaml: () => { if (requireAuth('/')) setChoice('yaml'); },
-    wasm: () => { if (requireAuth('/wasm')) router.push('/wasm'); },
-    integrate: () => { if (requireAuth('/integrate')) router.push('/integrate'); },
+    yaml: () => { requireAuth(() => setChoice('yaml')); },
+    wasm: () => { requireAuth(() => router.push('/wasm')); },
+    integrate: () => { requireAuth(() => router.push('/integrate')); },
   };
 
   const handlers: Record<string, () => void> = {
@@ -117,7 +118,6 @@ export default function LandingPage() {
         <div className={`lv2-nav-links ${menuOpen ? 'lv2-nav-links-open' : ''}`}>
           <ExternalLinksNav mode="inline" onNavigate={() => setMenuOpen(false)} />
           <AccountButton />
-          <WalletBar />
         </div>
       </nav>
 
@@ -147,7 +147,7 @@ export default function LandingPage() {
                   className="lv2-hero-cta-primary"
                   onClick={() => {
                     emitIntentSignal();
-                    router.push('/login?tab=signup');
+                    openLogin({ tab: 'signup' });
                   }}
                 >
                   Register Now →
