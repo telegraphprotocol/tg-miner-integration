@@ -1,5 +1,7 @@
 # Telegraph Miner Registry
 
+> **Out of date: do not register with this app.** It writes to an old Base Sepolia deployment (`0x5a23…7ff8`) that no node watches, so a registration made here is never indexed or scored. The live Telegraph testnet is on **Ethereum Sepolia** (chain ID 11155111), Diamond `0x72a70e949362670Bf8bceAd24eFC5b8f950aa08b`. Register a miner by following [Registering as a Miner](https://docs.telegraphprotocol.com/miners/miner-registration). Addresses: [Addresses & Parameters](https://docs.telegraphprotocol.com/protocol/addresses-and-params).
+
 Register your inference node on the [Telegraph Protocol](https://telegraphprotocol.com/). Configure a YAML descriptor, host it publicly, and submit your registration to the Telegraph Diamond contract on Base Sepolia — all from one interface.
 
 ---
@@ -98,7 +100,7 @@ Applies to both paths once you reach the Register On-Chain screen.
 
 ---
 
-## Contract
+## Contract (old, not live)
 
 | | |
 |---|---|
